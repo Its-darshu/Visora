@@ -1,0 +1,5 @@
+{
+  "name": "Multimodal Personal Tutor",
+  "description": "An interactive learning application that generates personalized lessons on any topic, complete with text, voice narration, and custom-generated visuals to create a rich, multimodal educational experience.",
+  "requestFramePermissions": []
+}
