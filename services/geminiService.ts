@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Lesson } from '../types';
+import { aiImageService } from './aiImageService';
 
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set");
@@ -67,21 +68,26 @@ export const generateLesson = async (topic: string): Promise<Lesson> => {
 };
 
 
+// Enhanced image generation with multiple AI sources and intelligent fallbacks
 export const generateImage = async (prompt: string): Promise<string> => {
-  const response = await ai.models.generateImages({
-    model: 'imagen-4.0-generate-001',
-    prompt: prompt,
-    config: {
-      numberOfImages: 1,
-      outputMimeType: 'image/png',
-      aspectRatio: '16:9',
-    },
-  });
-
-  const base64ImageBytes = response.generatedImages[0].image.imageBytes;
-  if (!base64ImageBytes) {
-      throw new Error("No image bytes returned from API.");
+  console.log('Generating image for prompt:', prompt);
+  
+  try {
+    // Use the advanced AI image service
+    const result = await aiImageService.generateImage({
+      prompt,
+      style: 'educational',
+      quality: 'high'
+    });
+    
+    console.log(`Image generated successfully via ${result.source}:`, result.url);
+    return result.url;
+  } catch (error) {
+    console.error('All image generation methods failed:', error);
+    
+    // Final emergency fallback
+    return 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&h=450&fit=crop&crop=center&q=80';
   }
-
-  return `data:image/png;base64,${base64ImageBytes}`;
 };
+
+
