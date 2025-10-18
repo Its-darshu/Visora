@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (IMPORTANT: Keep API keys secure!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +29,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright screenshots and test artifacts
+.playwright-mcp/
+
+# Optional npm cache directory
+.npm
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
