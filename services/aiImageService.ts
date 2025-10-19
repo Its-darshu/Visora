@@ -5,7 +5,11 @@ export interface ImageGenerationRequest {
   prompt: string;
   topic?: string;
   style?: 'educational' | 'realistic' | 'artistic' | 'scientific';
-  quality?: 'high' | 'medium' | 'fast';
+  quality?: 'standard' | 'high' | 'ultra';
+  dimensions?: {
+    width: number;
+    height: number;
+  };
 }
 
 export interface ImageGenerationResponse {
@@ -39,9 +43,9 @@ class AIImageService {
       };
     }
 
-    // Try different generation methods
+    // Try different generation methods with retry logic
     const generators = [
-      () => this.generateWithFlux(enhancedPrompt),
+      () => this.generateWithFlux(enhancedPrompt, request),
       () => this.generateWithPollinations(enhancedPrompt),
       () => this.generateWithIntelligentUnsplash(enhancedPrompt, request.topic),
       () => this.generateWithPicsum(enhancedPrompt),
@@ -51,6 +55,15 @@ class AIImageService {
       try {
         const result = await generator();
         if (result.success && result.url) {
+          // Test URL validity for external sources
+          if (!result.url.startsWith('data:') && result.source !== 'cache') {
+            const isValid = await this.testImageUrl(result.url);
+            if (!isValid) {
+              console.warn(`Image URL failed validation: ${result.source}`);
+              continue; // Try next generator
+            }
+          }
+          
           // Cache successful result
           this.cache.set(cacheKey, result.url);
           return {
@@ -70,8 +83,36 @@ class AIImageService {
     return this.getFallbackImage(request.topic);
   }
 
+  // Test if an image URL is actually accessible
+  private async testImageUrl(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(url, { 
+        method: 'HEAD',
+        timeout: 5000 
+      } as any);
+      return response.ok && response.headers.get('content-type')?.startsWith('image/');
+    } catch {
+      return false;
+    }
+  }
+
   private enhancePrompt(request: ImageGenerationRequest): string {
     let prompt = request.prompt;
+    
+    // Content filtering for inappropriate topics
+    const sensitiveTopics = [
+      'jeffrey epstein', 'sexual abuse', 'exploitation', 'violence', 'harassment',
+      'illegal activities', 'drugs', 'weapons', 'hate speech', 'discrimination'
+    ];
+    
+    const promptLower = prompt.toLowerCase();
+    const hasSensitiveContent = sensitiveTopics.some(topic => promptLower.includes(topic));
+    
+    if (hasSensitiveContent) {
+      // Replace with educational alternative
+      prompt = 'Professional educational diagram about legal studies and ethics';
+      console.warn('Sensitive content detected, using educational alternative');
+    }
     
     // Clean up common instructional text
     prompt = prompt
@@ -80,7 +121,13 @@ class AIImageService {
       .replace(/like a modern textbook illustration/gi, '')
       .replace(/avoid text in the image/gi, '')
       .replace(/["""]/g, '')
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
       .trim();
+
+    // Limit prompt length to prevent URL issues
+    if (prompt.length > 200) {
+      prompt = prompt.substring(0, 200).trim();
+    }
 
     // Add style-specific enhancements
     const styleMap = {
@@ -98,11 +145,10 @@ class AIImageService {
     return btoa(prompt).slice(0, 20);
   }
 
-  // Use Hugging Face Flux model via MCP
-  private async generateWithFlux(prompt: string): Promise<ImageGenerationResponse> {
+  // Use Hugging Face Flux model via Flask backend
+  private async generateWithFlux(enhancedPrompt: string, request?: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     try {
-      // Use the MCP Hugging Face Flux model for the best AI image generation
-      const result = await this.callHuggingFaceFlux(prompt);
+      const result = await this.callFluxBackend(enhancedPrompt, request);
       if (result) {
         return { url: result, source: 'huggingface-flux', success: true };
       }
@@ -113,25 +159,86 @@ class AIImageService {
     return { url: '', source: 'flux', success: false };
   }
 
-  // Helper to call Hugging Face Flux model
-  private async callHuggingFaceFlux(prompt: string): Promise<string | null> {
+  // Helper to call Flask backend for Hugging Face Flux
+  private async callFluxBackend(prompt: string, request?: ImageGenerationRequest): Promise<string | null> {
     try {
-      // This would integrate with the Hugging Face MCP tools
-      // For now, we'll prepare the structure for future integration
+      const dimensions = request?.dimensions || { width: 800, height: 450 };
+      const quality = request?.quality || 'high';
+      
+      // Enhance dimensions based on quality
+      if (quality === 'ultra') {
+        dimensions.width = Math.min(dimensions.width * 1.5, 1024);
+        dimensions.height = Math.min(dimensions.height * 1.5, 1024);
+      } else if (quality === 'high') {
+        dimensions.width = Math.min(dimensions.width * 1.25, 1024);
+        dimensions.height = Math.min(dimensions.height * 1.25, 1024);
+      }
+      
+      const response = await fetch('http://localhost:5000/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          width: Math.round(dimensions.width),
+          height: Math.round(dimensions.height),
+          quality_mode: quality
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        
+        // Handle specific error cases
+        if (response.status === 503 && errorData?.error === 'model_loading') {
+          console.warn('Hugging Face model is loading, will retry later');
+          return null;
+        }
+        
+        console.warn(`Flask backend error: ${response.status}`, errorData);
+        return null;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.image) {
+        return data.image; // Base64 data URL
+      }
+      
       return null;
     } catch (error) {
+      // Backend might not be running, fail silently and use fallback
+      console.warn('Flask backend not available:', error);
       return null;
     }
   }
 
   private async generateWithPollinations(prompt: string): Promise<ImageGenerationResponse> {
     try {
-      const encodedPrompt = encodeURIComponent(prompt);
+      // Clean and limit prompt for URL safety
+      const cleanPrompt = prompt
+        .replace(/[^\w\s,.-]/g, '') // Remove special characters that might break URLs
+        .replace(/\s+/g, ' ') // Replace multiple spaces
+        .trim()
+        .substring(0, 150); // Limit length
+      
+      const encodedPrompt = encodeURIComponent(cleanPrompt);
       const seed = Math.floor(Math.random() * 10000);
       const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=450&seed=${seed}&enhance=true&nologo=true`;
       
+      // Test if the URL is valid before returning
+      if (url.length > 2000) {
+        console.warn('Pollinations URL too long, shortening prompt');
+        const shortPrompt = cleanPrompt.substring(0, 50);
+        const shortEncodedPrompt = encodeURIComponent(shortPrompt);
+        const shortUrl = `https://image.pollinations.ai/prompt/${shortEncodedPrompt}?width=800&height=450&seed=${seed}&enhance=true&nologo=true`;
+        return { url: shortUrl, source: 'pollinations', success: true };
+      }
+      
       return { url, source: 'pollinations', success: true };
     } catch (error) {
+      console.warn('Pollinations generation failed:', error);
       return { url: '', source: 'pollinations', success: false };
     }
   }

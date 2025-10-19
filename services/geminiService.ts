@@ -3,11 +3,14 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { Lesson } from '../types';
 import { aiImageService } from './aiImageService';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set");
+// Access environment variable properly in Vite
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+if (!API_KEY) {
+    throw new Error("VITE_API_KEY environment variable is not set");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 const lessonSchema = {
   type: Type.OBJECT,
