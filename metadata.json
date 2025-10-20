@@ -1,5 +1,7 @@
 {
-  "name": "Multimodal Personal Tutor",
-  "description": "An interactive learning application that generates personalized lessons on any topic, complete with text, voice narration, and custom-generated visuals to create a rich, multimodal educational experience.",
+  "name": "Visora - AI Visual Intelligence Platform",
+  "description": "Unified AI platform for visual content enhancement and app intelligence. Features image-to-text summarization, AI image generation and enhancement, outpainting, real-time NLP, voice intelligence, and personalized predictions. Built for Cognex Hackathon PS3.",
+  "version": "1.0.0",
+  "hackathon": "Cognex 2025 - Problem Statement 3",
   "requestFramePermissions": []
 }

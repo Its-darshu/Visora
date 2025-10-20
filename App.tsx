@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
+import ImageIntelligence from './pages/ImageIntelligence';
+import TextIntelligence from './pages/TextIntelligence';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -17,6 +19,22 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/image-intelligence" 
+            element={
+              <ProtectedRoute>
+                <ImageIntelligence />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/text-intelligence" 
+            element={
+              <ProtectedRoute>
+                <TextIntelligence />
               </ProtectedRoute>
             } 
           />

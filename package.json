@@ -1,8 +1,9 @@
 {
-  "name": "multimodal-personal-tutor",
+  "name": "visora-ai-platform",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "AI-Powered Visual & App Intelligence Platform - Cognex Hackathon PS3",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
