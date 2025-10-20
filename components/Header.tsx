@@ -36,6 +36,8 @@ const Header: React.FC = () => {
     { path: '/dashboard', icon: 'fa-home', label: 'Dashboard', emoji: '🏠' },
     { path: '/image-intelligence', icon: 'fa-image', label: 'Image AI', emoji: '🖼️' },
     { path: '/text-intelligence', icon: 'fa-file-text', label: 'Text AI', emoji: '💬' },
+    { path: '/analytics', icon: 'fa-chart-line', label: 'Analytics', emoji: '📊' },
+    { path: '/settings', icon: 'fa-cog', label: 'Settings', emoji: '⚙️' },
   ];
 
   const isActivePath = (path: string) => location.pathname === path;

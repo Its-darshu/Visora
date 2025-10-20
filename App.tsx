@@ -6,6 +6,8 @@ import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ImageIntelligence from './pages/ImageIntelligence';
 import TextIntelligence from './pages/TextIntelligence';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -35,6 +37,22 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <TextIntelligence />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/analytics" 
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             } 
           />
