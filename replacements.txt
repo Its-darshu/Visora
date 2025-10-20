@@ -1,0 +1,11 @@
+# BFG Repo-Cleaner replacement patterns# BFG Repo-Cleaner replacement patterns
+
+# Each line: original_text==>replacement_text# Each line: original_text==>replacement_text
+
+
+
+EXAMPLE_FIREBASE_KEY==>***FIREBASE_API_KEY_REMOVED***EXAMPLE_FIREBASE_KEY==>***FIREBASE_API_KEY_REMOVED***
+
+EXAMPLE_GEMINI_KEY==>***GEMINI_API_KEY_REMOVED***EXAMPLE_GEMINI_KEY==>***GEMINI_API_KEY_REMOVED***
+
+EXAMPLE_HUGGINGFACE_TOKEN==>***HUGGINGFACE_TOKEN_REMOVED***EXAMPLE_HUGGINGFACE_TOKEN==>***HUGGINGFACE_TOKEN_REMOVED***
