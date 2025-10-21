@@ -3,11 +3,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import AuthPage from './pages/AuthPage';
-import Dashboard from './pages/Dashboard';
-import ImageIntelligence from './pages/ImageIntelligence';
-import TextIntelligence from './pages/TextIntelligence';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
+import LandingPage from './pages/LandingPage';
+import VisualIntelligencePage from './pages/VisualIntelligencePage';
+import GenerateImagePage from './pages/GenerateImagePage';
+import EnhanceEditPage from './pages/EnhanceEditPage';
+import AppIntelligencePage from './pages/AppIntelligencePage';
+import RealTimePredictionsPage from './pages/RealTimePredictionsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -15,48 +16,51 @@ const App: React.FC = () => {
     <AuthProvider>
       <Router>
         <Routes>
+          {/* Public Landing Page */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
+          
+          {/* Protected Pages */}
           <Route 
-            path="/dashboard" 
+            path="/visual-intelligence" 
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <VisualIntelligencePage />
               </ProtectedRoute>
             } 
           />
           <Route 
-            path="/image-intelligence" 
+            path="/generate" 
             element={
               <ProtectedRoute>
-                <ImageIntelligence />
+                <GenerateImagePage />
               </ProtectedRoute>
             } 
           />
           <Route 
-            path="/text-intelligence" 
+            path="/enhance-edit" 
             element={
               <ProtectedRoute>
-                <TextIntelligence />
+                <EnhanceEditPage />
               </ProtectedRoute>
             } 
           />
           <Route 
-            path="/analytics" 
+            path="/app-intelligence" 
             element={
               <ProtectedRoute>
-                <Analytics />
+                <AppIntelligencePage />
               </ProtectedRoute>
             } 
           />
           <Route 
-            path="/settings" 
+            path="/predictions" 
             element={
               <ProtectedRoute>
-                <Settings />
+                <RealTimePredictionsPage />
               </ProtectedRoute>
             } 
           />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
       </Router>
     </AuthProvider>

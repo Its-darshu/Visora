@@ -33,11 +33,11 @@ const Header: React.FC = () => {
   };
 
   const navigationItems = [
-    { path: '/dashboard', icon: 'fa-home', label: 'Dashboard', emoji: '🏠' },
-    { path: '/image-intelligence', icon: 'fa-image', label: 'Image AI', emoji: '🖼️' },
-    { path: '/text-intelligence', icon: 'fa-file-text', label: 'Text AI', emoji: '💬' },
-    { path: '/analytics', icon: 'fa-chart-line', label: 'Analytics', emoji: '📊' },
-    { path: '/settings', icon: 'fa-cog', label: 'Settings', emoji: '⚙️' },
+    { path: '/visual-intelligence', icon: 'fa-eye', label: 'Visual AI', emoji: '👁️' },
+    { path: '/generate', icon: 'fa-wand-magic-sparkles', label: 'Generate', emoji: '✨' },
+    { path: '/enhance-edit', icon: 'fa-sliders', label: 'Edit', emoji: '🎨' },
+    { path: '/app-intelligence', icon: 'fa-comments', label: 'Chat', emoji: '💬' },
+    { path: '/predictions', icon: 'fa-chart-line', label: 'Predictions', emoji: '📊' },
   ];
 
   const isActivePath = (path: string) => location.pathname === path;
@@ -49,7 +49,7 @@ const Header: React.FC = () => {
           {/* Logo */}
           <div 
             className="flex items-center space-x-3 cursor-pointer"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/visual-intelligence')}
           >
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
               <span className="text-2xl">🎨</span>
