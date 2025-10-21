@@ -61,8 +61,8 @@ const GenerateImagePage: React.FC = () => {
                 disabled={!prompt.trim() || isGenerating}
                 className="w-full h-14 bg-[#7f13ec] text-white text-lg font-bold rounded-lg hover:bg-[#7f13ec]/90 transition-all hover:shadow-[0_0_15px_rgba(191,0,255,0.5)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#121212] focus:ring-[#7f13ec] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <span className="material-symbols-outlined">auto_awesome</span>
-                {isGenerating ? 'Generating...' : 'Generate Image'}
+                <span className="material-symbols-outlined">Generate Image</span>
+                {isGenerating ? 'Generating...' : ''}
               </button>
             </div>
           </div>
