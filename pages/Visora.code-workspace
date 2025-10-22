@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../visora UI/real-time_predictions"
+		},
+		{
+			"path": "../../visora UI/app_intelligence"
+		},
+		{
+			"path": "../../visora UI/dashboard_"
+		},
+		{
+			"path": "../../visora UI/enhance_&_edit"
+		},
+		{
+			"path": "../../visora UI/generate_(text_→_image)"
+		},
+		{
+			"path": "../../visora UI/visual_intelligence"
+		},
+		{
+			"path": "../../visora UI/sign_up_screen"
+		}
+	],
+	"settings": {}
+}

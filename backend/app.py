@@ -1,5 +1,5 @@
-# Hugging Face Flux API Service
-# Flask backend for AI image generation using Hugging Face models
+# Hugging Face Flux API Service + Image Analysis
+# Flask backend for AI image generation and text extraction using Hugging Face models and Gemini AI
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -10,16 +10,40 @@ import os
 from PIL import Image
 import time
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+import google.generativeai as genai
+
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    print("⚠️  Warning: pytesseract not available. OCR will use AI only.")
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+app.config['UPLOAD_FOLDER'] = 'uploads'
+
+# Create uploads folder
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Hugging Face configuration
 HF_API_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN')
 HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+
+# Gemini AI configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+if GEMINI_API_KEY and GEMINI_API_KEY != 'your_gemini_api_key_here':
+    genai.configure(api_key=GEMINI_API_KEY)
+    print("✅ Gemini AI configured successfully")
+else:
+    print("⚠️  Warning: GEMINI_API_KEY not configured properly")
+    print("   Add your key to backend/.env file")
+    print("   Get key from: https://makersuite.google.com/app/apikey")
 
 # Headers for Hugging Face API
 headers = {
@@ -292,6 +316,186 @@ def list_models():
             }
         }
     })
+
+# ============================================
+# IMAGE ANALYSIS ENDPOINTS
+# ============================================
+
+def extract_text_from_image(image_path):
+    """Extract text from image or describe image content using AI."""
+    try:
+        # Try Tesseract first if available
+        if TESSERACT_AVAILABLE:
+            try:
+                img = Image.open(image_path)
+                text = pytesseract.image_to_string(img)
+                if text.strip():
+                    return text.strip()
+            except Exception:
+                pass
+
+        # Use Gemini Vision for image analysis
+        if GEMINI_API_KEY and GEMINI_API_KEY != 'your_gemini_api_key_here':
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            img = Image.open(image_path)
+
+            prompt = """Analyze this image carefully.
+
+If there is TEXT in the image:
+- Extract all text exactly as shown
+- Preserve formatting and structure
+- List any questions clearly
+
+If there is NO TEXT or very little text:
+- Describe what you see in detail
+- Explain what the image represents
+- Identify objects, people, places, or activities
+- Describe colors, setting, and mood
+- Explain the context or purpose of the image
+
+Be thorough and descriptive."""
+
+            response = model.generate_content([prompt, img])
+            return response.text.strip()
+
+        return "Could not analyze image - No AI service available"
+    except Exception as e:
+        return f"Error analyzing image: {str(e)}"
+
+
+def analyze_with_ai(content, prompt=None):
+    """Analyze content using Gemini AI."""
+    try:
+        if not GEMINI_API_KEY or GEMINI_API_KEY == 'your_gemini_api_key_here':
+            return "Error: GEMINI_API_KEY not configured. Please add your Gemini API key to backend/.env file. Get key from: https://makersuite.google.com/app/apikey"
+
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+
+        if prompt:
+            # User provided custom prompt
+            full_prompt = f"""{prompt}
+
+Content:
+{content}
+
+IMPORTANT: Write in natural, conversational language.
+- Use simple, clear sentences
+- Explain like you're talking to a friend
+- NO markdown symbols (no ##, **, etc.)
+- Use "First," "Second," instead of "1." "2."
+- Write in paragraphs with proper spacing
+- Be conversational and helpful
+- Give complete, accurate answers
+
+Make it easy to read and understand."""
+        else:
+            # Auto-generate intelligent analysis
+            full_prompt = f"""Analyze this content and provide a helpful response.
+
+Content:
+{content}
+
+IMPORTANT INSTRUCTIONS:
+- Write in natural, conversational English
+- NO markdown symbols (no ##, **, ###, etc.)
+- Use simple headings like "Summary:" or "Key Points:"
+- Explain things clearly like talking to a friend
+- Use "First," "Second," "Third" instead of numbers
+- Write in complete sentences and paragraphs
+- Be warm, friendly, and helpful
+- Give accurate, detailed information
+
+Structure your response naturally:
+
+SUMMARY:
+Give a brief overview in 2-3 sentences.
+
+KEY POINTS:
+List the main points in a clear, easy-to-read way.
+
+DETAILED EXPLANATION:
+Explain everything thoroughly and clearly.
+
+QUESTIONS AND ANSWERS:
+If there are questions in the content, answer each one completely and accurately.
+
+RECOMMENDATIONS:
+Suggest helpful next steps or insights.
+
+Write everything in clear, natural language that's easy to understand."""
+
+        response = model.generate_content(full_prompt)
+        return response.text.strip()
+
+    except Exception as e:
+        return f"Error analyzing content: {str(e)}"
+
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    """Handle file upload and text extraction."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Save file
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        # Detect file type and extract text
+        ext = filename.lower().split('.')[-1]
+        extracted_text = ""
+
+        if ext in ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'webp']:
+            extracted_text = extract_text_from_image(filepath)
+        else:
+            os.remove(filepath)
+            return jsonify({'error': 'Unsupported file type. Please upload an image.'}), 400
+
+        # Clean up file
+        os.remove(filepath)
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'fileType': ext,
+            'extractedText': extracted_text[:500],  # Preview
+            'fullText': extracted_text
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analyze', methods=['POST'])
+def analyze_content():
+    """Analyze content with AI."""
+    try:
+        data = request.json
+        content = data.get('content', '')
+        prompt = data.get('prompt', None)
+
+        if not content:
+            return jsonify({'error': 'No content provided'}), 400
+
+        result = analyze_with_ai(content, prompt)
+
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# END IMAGE ANALYSIS ENDPOINTS
+# ============================================
 
 if __name__ == '__main__':
     # Check for required environment variables
