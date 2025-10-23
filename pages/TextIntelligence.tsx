@@ -31,12 +31,84 @@ const TextIntelligence: React.FC = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    // Check if browser supports speech recognition
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        console.log('🎤 Voice recognition started');
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0])
+          .map((result: any) => result.transcript)
+          .join('');
+        
+        setInputText(transcript);
+        console.log('📝 Transcript:', transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('❌ Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        if (event.error === 'no-speech') {
+          alert('No speech detected. Please try again.');
+        } else if (event.error === 'not-allowed') {
+          alert('Microphone access denied. Please allow microphone access in your browser settings.');
+        }
+      };
+
+      recognition.onend = () => {
+        console.log('🎤 Voice recognition ended');
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    } else {
+      console.warn('⚠️ Speech recognition not supported in this browser');
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle microphone button click
+  const handleMicClick = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputText.trim() && !selectedImage) return;
@@ -281,6 +353,115 @@ Respond with well-formatted, easy-to-read content:`;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  // Copy message text to clipboard
+  const handleCopyMessage = (text: string, messageId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMessageId(messageId);
+    // Reset after 2 seconds
+    setTimeout(() => {
+      setCopiedMessageId(null);
+    }, 2000);
+  };
+
+  // Share message (native share API)
+  const handleShareMessage = async (text: string, messageId: string) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'VISORA AI Response',
+          text: text
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      handleCopyMessage(text, messageId);
+    }
+  };
+
+  // Export message as PDF with Visora branding
+  const handleExportPDF = async (messageText: string, context: string) => {
+    try {
+      // Dynamic import of jsPDF
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      let currentY = 20;
+      
+      // Add Visora Logo with pixel blocks (matching Figma design)
+      // Orange block
+      doc.setFillColor(255, 119, 0); // #ff7700
+      doc.rect(margin, currentY - 5, 6, 6, 'F');
+      
+      // Blue block
+      doc.setFillColor(9, 0, 255); // #0900ff
+      doc.rect(margin + 10, currentY + 2, 6, 6, 'F');
+      
+      // Yellow block
+      doc.setFillColor(255, 187, 0); // #ffbb00
+      doc.rect(margin + 20, currentY - 5, 6, 6, 'F');
+      
+      // Visora text in Silkscreen-style
+      doc.setFontSize(20);
+      doc.setFont('courier', 'bold'); // Monospace font for pixel look
+      doc.setTextColor(0, 0, 0);
+      doc.text('visora', margin + 2, currentY + 5);
+      
+      currentY += 20;
+      
+      // Add context/purpose in bold
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      const contextLines = doc.splitTextToSize(context, contentWidth);
+      doc.text(contextLines, margin, currentY);
+      currentY += (contextLines.length * 7) + 10;
+      
+      // Add separator line
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.line(margin, currentY, pageWidth - margin, currentY);
+      currentY += 10;
+      
+      // Add content
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      
+      // Split text into lines that fit the page width
+      const lines = doc.splitTextToSize(messageText, contentWidth);
+      
+      lines.forEach((line: string) => {
+        // Check if we need a new page
+        if (currentY > pageHeight - 30) {
+          doc.addPage();
+          currentY = 20;
+        }
+        doc.text(line, margin, currentY);
+        currentY += 7;
+      });
+      
+      // Add footer with timestamp
+      const footer = `Generated by VISORA AI - ${new Date().toLocaleString()}`;
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(footer, margin, pageHeight - 10);
+      
+      // Save the PDF
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      doc.save(`visora-ai-response-${timestamp}.pdf`);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -578,26 +759,96 @@ Respond with well-formatted, easy-to-read content:`;
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {messages.map((message) => (
+                  {messages.map((message, index) => (
                     <div
                       key={message.id}
                       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div
-                        className={`max-w-[70%] p-4 border border-black ${
-                          message.sender === 'user' ? 'bg-[#d3e4ff]' : 'bg-[#f0f0f0]'
-                        }`}
-                        style={{ fontFamily: "'Product Sans', sans-serif", boxShadow: '3px 3px 0px 0px #000000' }}
-                      >
-                        {message.image && (
-                          <img src={message.image} alt="Uploaded" className="max-w-full mb-2 rounded" />
-                        )}
-                        <div className="text-black">
-                          {renderMessageContent(message.text)}
+                      <div className="flex flex-col max-w-[70%]">
+                        <div
+                          className={`p-4 border border-black ${
+                            message.sender === 'user' ? 'bg-[#d3e4ff]' : 'bg-[#f0f0f0]'
+                          }`}
+                          style={{ fontFamily: "'Product Sans', sans-serif", boxShadow: '3px 3px 0px 0px #000000' }}
+                        >
+                          {message.image && (
+                            <img src={message.image} alt="Uploaded" className="max-w-full mb-2 rounded" />
+                          )}
+                          <div className="text-black">
+                            {renderMessageContent(message.text)}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {message.timestamp.toLocaleTimeString()}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {message.timestamp.toLocaleTimeString()}
-                        </p>
+                        
+                        {/* Action buttons for bot messages */}
+                        {message.sender === 'bot' && (
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => handleCopyMessage(message.text, message.id)}
+                              className={`border border-black px-3 py-1 transition-all text-[10px] flex items-center gap-1 ${
+                                copiedMessageId === message.id 
+                                  ? 'bg-[#00ff00] text-black' 
+                                  : 'bg-white hover:bg-gray-100 text-black'
+                              }`}
+                              style={{ boxShadow: '2px 2px 0px 0px #000000', fontFamily: "'Silkscreen', monospace" }}
+                              title="Copy to clipboard"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                  COPIED!
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                  </svg>
+                                  COPY
+                                </>
+                              )}
+                            </button>
+                            
+                            <button
+                              onClick={() => handleShareMessage(message.text, message.id)}
+                              className="bg-white border border-black px-3 py-1 hover:bg-gray-100 transition-colors text-[10px] flex items-center gap-1"
+                              style={{ boxShadow: '2px 2px 0px 0px #000000', fontFamily: "'Silkscreen', monospace" }}
+                              title="Share"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="18" cy="5" r="3"></circle>
+                                <circle cx="6" cy="12" r="3"></circle>
+                                <circle cx="18" cy="19" r="3"></circle>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                              </svg>
+                              SHARE
+                            </button>
+                            
+                            <button
+                              onClick={() => {
+                                // Get the user's question from previous message
+                                const userQuestion = index > 0 ? messages[index - 1]?.text || 'AI Response' : 'AI Response';
+                                handleExportPDF(message.text, `Question: ${userQuestion}`);
+                              }}
+                              className="bg-[#523bb5] border border-black text-white px-3 py-1 hover:bg-[#6347d6] transition-colors text-[10px] flex items-center gap-1"
+                              style={{ boxShadow: '2px 2px 0px 0px #000000', fontFamily: "'Silkscreen', monospace" }}
+                              title="Export as PDF"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" y1="18" x2="12" y2="12"></line>
+                                <line x1="9" y1="15" x2="15" y2="15"></line>
+                              </svg>
+                              PDF
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -665,10 +916,20 @@ Respond with well-formatted, easy-to-read content:`;
 
               {/* Mic Button */}
               <button
-                className="bg-[#d3e5ff] border-2 border-black h-[60px] w-[84px] flex items-center justify-center hover:bg-[#c0d4ef] transition-colors"
-                title="Voice Input"
+                onClick={handleMicClick}
+                className={`border-2 border-black h-[60px] w-[84px] flex items-center justify-center transition-all ${
+                  isListening 
+                    ? 'bg-[#ff0000] animate-pulse' 
+                    : 'bg-[#d3e5ff] hover:bg-[#c0d4ef]'
+                }`}
+                title={isListening ? 'Stop Recording' : 'Voice Input'}
+                style={{ boxShadow: '3px 3px 0px 0px #000000' }}
               >
-                <img src={imgMaterialSymbolsMic} alt="Mic" className="w-[44px] h-[44px]" />
+                <img 
+                  src={imgMaterialSymbolsMic} 
+                  alt="Mic" 
+                  className={`w-[44px] h-[44px] ${isListening ? 'brightness-0 invert' : ''}`}
+                />
               </button>
 
               {/* Upload Button */}
