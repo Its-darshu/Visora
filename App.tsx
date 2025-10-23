@@ -7,6 +7,7 @@ import LandingPage from './pages/LandingPage';
 import VisualIntelligencePage from './pages/VisualIntelligencePage';
 import GenerateImagePage from './pages/GenerateImagePage';
 import EnhanceEditPage from './pages/EnhanceEditPage';
+import TextIntelligence from './pages/TextIntelligence';
 import AppIntelligencePage from './pages/AppIntelligencePage';
 import RealTimePredictionsPage from './pages/RealTimePredictionsPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -38,10 +39,26 @@ const App: React.FC = () => {
             } 
           />
           <Route 
+            path="/generate-image" 
+            element={
+              <ProtectedRoute>
+                <GenerateImagePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/enhance-edit" 
             element={
               <ProtectedRoute>
                 <EnhanceEditPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/text-intelligence" 
+            element={
+              <ProtectedRoute>
+                <TextIntelligence />
               </ProtectedRoute>
             } 
           />

@@ -1,15 +1,23 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { imageAnalysisService } from '../services/imageAnalysisService';
-import Header from '../components/Header';
+import { useAuth } from '../contexts/AuthContext';
+
+// Figma asset URLs
+const imgProfileTab = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
+const imgVector = "http://localhost:3845/assets/b000d29f08e8de2107e6ac60627be28585c51daf.svg";
+const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
 
 const VisualIntelligencePage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
-  const [customPrompt, setCustomPrompt] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,8 +47,7 @@ const VisualIntelligencePage: React.FC = () => {
     
     try {
       const result = await imageAnalysisService.analyzeImage({
-        file: selectedFile,
-        customPrompt: customPrompt.trim() || undefined
+        file: selectedFile
       });
       
       if (result.success) {
@@ -64,215 +71,233 @@ const VisualIntelligencePage: React.FC = () => {
     setPreviewUrl(null);
     setExtractedText('');
     setAiAnalysis('');
-    setCustomPrompt('');
     setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white font-['Inter']">
-      <Header />
-      
-      <main className="flex-1 mt-24 px-4 sm:px-10 py-8 max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-[#00FFFF] to-[#BF00FF] bg-clip-text text-transparent">
-            Image → Text Analysis
-          </h1>
-          <p className="text-white/60">Extract text from images and get AI-powered analysis</p>
+    <div className="min-h-screen bg-white relative overflow-x-hidden">
+      {/* Header */}
+      <header className="flex items-center p-1.5 gap-2">
+        {/* Logo */}
+        <div 
+          className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
+          onClick={() => navigate('/')}
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+        >
+          <h1 className="text-[40px] font-bold text-black">VISORA</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Upload & Controls */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
-            {/* Upload Section */}
-            <div className="flex flex-col gap-6 p-6 rounded-xl glassmorphism">
-              <h2 className="text-xl font-bold">Upload Image</h2>
-              
-              <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-[#4d3267] px-6 py-10 hover:border-[#7f13ec] transition-colors">
-                <span className="material-symbols-outlined text-6xl text-[#7f13ec]">
-                  upload_file
-                </span>
-                <div className="text-center">
-                  <p className="text-sm text-white/80 mb-1">Click to upload or drag and drop</p>
-                  <p className="text-xs text-white/60">PNG, JPG, GIF, BMP, WEBP (Max 16MB)</p>
-                </div>
+        {/* Navigation Bar */}
+        <nav 
+          className="bg-[#e07400] border border-black flex items-center justify-center gap-0 h-[89px] flex-1 overflow-hidden"
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+        >
+          <button
+            onClick={() => navigate('/visual-intelligence')}
+            className="bg-[#523bb5] border border-black px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-[#6347d6] transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">VISUAL AI</span>
+          </button>
+          <button
+            onClick={() => navigate('/generate-image')}
+            className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">GENERATE</span>
+          </button>
+          <button
+            onClick={() => navigate('/enhance-edit')}
+            className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">AI STUDIO</span>
+          </button>
+          <button
+            onClick={() => navigate('/text-intelligence')}
+            className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">CHAT</span>
+          </button>
+        </nav>
+
+        {/* Profile Dropdown */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="h-[89px] w-[182px] flex items-center justify-center"
+            style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
+          >
+            <img src={imgProfileTab} alt="Profile" className="w-full h-full object-contain" />
+          </button>
+          {showProfileMenu && (
+            <div className="absolute right-0 top-full mt-2 bg-white border border-black z-50 min-w-[180px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
+              <button
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  navigate('/settings');
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-100 border-b border-black text-black"
+                style={{ fontFamily: "'Silkscreen', monospace" }}
+              >
+                Settings
+              </button>
+              <button
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  // Add logout logic here
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-100 text-black"
+                style={{ fontFamily: "'Silkscreen', monospace" }}
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex flex-col lg:flex-row gap-4 p-4 mt-4">
+        {/* Left Sidebar - History */}
+        <aside 
+          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4"
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+        >
+          <h2 className="text-[20px] text-black text-center">HISTORY</h2>
+          <div className="bg-white border border-black h-[44px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}></div>
+          {/* Add more history items here as needed */}
+        </aside>
+
+        {/* Center Content */}
+        <div className="flex-1 flex flex-col gap-4">
+          {/* Description Banner */}
+          <div 
+            className="bg-[#79d7a8] border border-black p-4"
+            style={{ fontFamily: "'Product Sans', sans-serif", fontWeight: 300, boxShadow: '5px 5px 0px 0px #000000' }}
+          >
+            <p className="text-[18px] md:text-[24px] text-black">
+              Turn visuals into words. VISORA's Visual AI analyzes your image and generates clear, detailed text descriptions in seconds.
+            </p>
+          </div>
+
+          {/* Upload and Output Section */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Upload Card */}
+            <div 
+              className="bg-[#ffd48e] border border-black p-6 w-full lg:w-[433px] flex flex-col gap-4"
+              style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+            >
+              {/* Upload Area */}
+              <div 
+                className="border border-dashed border-black h-[302px] flex flex-col items-center justify-center gap-5 cursor-pointer hover:bg-[#ffe4b0] transition-colors relative"
+                onClick={() => document.getElementById('file-input')?.click()}
+              >
+                {previewUrl ? (
+                  <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+                ) : (
+                  <>
+                    <img src={imgVector} alt="Upload" className="w-[40px] h-[40px]" />
+                    <p className="text-[24px] text-black">UPLOAD</p>
+                  </>
+                )}
                 <input
+                  id="file-input"
                   type="file"
                   accept="image/*"
                   onChange={handleFileSelect}
                   className="hidden"
-                  id="image-upload"
                 />
-                <label 
-                  htmlFor="image-upload"
-                  className="px-6 h-10 bg-[#7f13ec] text-white text-sm font-bold rounded-lg hover:bg-[#7f13ec]/90 transition-colors cursor-pointer flex items-center justify-center"
-                >
-                  Browse Files
-                </label>
               </div>
+
+              {/* Submit Button */}
+              <button
+                onClick={analyzeImage}
+                disabled={!selectedFile || isAnalyzing}
+                className="relative bg-black text-white h-[74px] overflow-hidden hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ 
+                  boxShadow: '5px 5px 0px 0px #000000',
+                  fontFamily: "'Silkscreen', monospace"
+                }}
+              >
+                <span className="relative z-10 text-[36px]">
+                  {isAnalyzing ? 'LOADING...' : 'SUBMIT'}
+                </span>
+                <div 
+                  className="absolute top-0 right-0 bottom-0 w-[180px] pointer-events-none"
+                  style={{
+                    background: 'linear-gradient(to left, #ffa500 0%, rgba(255, 165, 0, 0.8) 40%, transparent 100%)'
+                  }}
+                />
+              </button>
 
               {selectedFile && (
-                <div className="text-sm text-white/80 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#00FFFF]">image</span>
-                  <span className="truncate">{selectedFile.name}</span>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-black truncate">{selectedFile.name}</p>
+                  <button
+                    onClick={handleClearAll}
+                    className="text-sm text-black underline hover:no-underline"
+                  >
+                    Clear
+                  </button>
                 </div>
               )}
 
-              {/* Preview */}
-              {previewUrl && (
-                <div className="relative w-full rounded-xl overflow-hidden">
-                  <img src={previewUrl} alt="Preview" className="w-full h-auto object-contain rounded-lg border border-white/10" />
-                </div>
-              )}
-
-              {/* Custom Prompt */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-white/90">
-                  Custom Analysis Prompt (Optional)
-                </label>
-                <textarea
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="E.g., 'Describe this image in detail' or 'Extract all text from this document'"
-                  className="w-full px-4 py-3 rounded-lg bg-[#261933]/50 border border-[#4d3267] focus:border-[#7f13ec] focus:outline-none text-white placeholder:text-[#ad92c9] resize-none transition-all"
-                  rows={3}
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={analyzeImage}
-                  disabled={!selectedFile || isAnalyzing}
-                  className="flex-1 h-12 bg-[#00FFFF] text-black text-base font-bold rounded-lg hover:shadow-[0_0_15px_rgba(0,255,255,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-                      <span>Processing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined">auto_awesome</span>
-                      <span>Analyze</span>
-                    </>
-                  )}
-                </button>
-                
-                <button
-                  onClick={handleClearAll}
-                  disabled={!selectedFile && !extractedText && !aiAnalysis}
-                  className="px-4 h-12 bg-white/10 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Clear
-                </button>
-              </div>
-
-              {/* Error Display */}
               {error && (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-3">
-                  <span className="material-symbols-outlined text-red-400">error</span>
-                  <div className="flex-1">
-                    <p className="text-sm text-red-400 font-medium">Error</p>
-                    <p className="text-xs text-red-300 mt-1">{error}</p>
-                  </div>
+                <div className="bg-red-100 border border-red-500 p-3" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
+                  <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Right Column - Results */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {(extractedText || aiAnalysis) ? (
-              <>
-                {/* Extracted Text */}
-                {extractedText && (
-                  <div className="flex flex-col gap-4 p-6 rounded-xl glassmorphism">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#00FFFF]">text_snippet</span>
-                      <h2 className="text-xl font-bold">Extracted Content</h2>
+            {/* Output Region */}
+            <div 
+              className="bg-white border border-black w-full lg:flex-1 min-h-[466px] p-6 overflow-y-auto"
+              style={{ fontFamily: "'Product Sans', sans-serif", boxShadow: '5px 5px 0px 0px #000000' }}
+            >
+              {extractedText || aiAnalysis ? (
+                <div className="flex flex-col gap-6">
+                  {extractedText && (
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 text-black">Extracted Text:</h3>
+                      <p className="text-black whitespace-pre-wrap leading-relaxed">{extractedText}</p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(extractedText)}
+                        className="mt-3 px-4 py-2 bg-black text-white text-sm hover:bg-gray-800 transition-colors"
+                      >
+                        Copy Text
+                      </button>
                     </div>
-                    <div className="p-4 rounded-lg bg-[#261933]/50 border border-[#4d3267]">
-                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
-                        {extractedText}
-                      </p>
+                  )}
+                  {aiAnalysis && (
+                    <div>
+                      <h3 className="text-xl font-bold mb-3 text-black">AI Analysis:</h3>
+                      <p className="text-black whitespace-pre-wrap leading-relaxed">{aiAnalysis}</p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(aiAnalysis)}
+                        className="mt-3 px-4 py-2 bg-black text-white text-sm hover:bg-gray-800 transition-colors"
+                      >
+                        Copy Analysis
+                      </button>
                     </div>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(extractedText)}
-                      className="self-start px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-base">content_copy</span>
-                      Copy Text
-                    </button>
-                  </div>
-                )}
-
-                {/* AI Analysis */}
-                {aiAnalysis && (
-                  <div className="flex flex-col gap-4 p-6 rounded-xl glassmorphism">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#BF00FF]">psychology</span>
-                      <h2 className="text-xl font-bold">AI Analysis</h2>
-                    </div>
-                    <div className="p-4 rounded-lg bg-gradient-to-br from-[#BF00FF]/10 to-[#7f13ec]/10 border border-[#BF00FF]/30">
-                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
-                        {aiAnalysis}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(aiAnalysis)}
-                      className="self-start px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-base">content_copy</span>
-                      Copy Analysis
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col gap-6 p-12 rounded-xl glassmorphism items-center justify-center min-h-[500px]">
-                <div className="w-24 h-24 rounded-full bg-[#7f13ec]/20 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-6xl text-[#7f13ec]">image_search</span>
+                  )}
                 </div>
-                <div className="text-center max-w-md">
-                  <h3 className="text-2xl font-bold mb-2">Ready to Analyze</h3>
-                  <p className="text-white/60 text-sm">
-                    Upload an image to extract text and get AI-powered insights. 
-                    Supports OCR, object detection, and intelligent content analysis.
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-400 text-center">
+                    Upload an image and click Submit to see the analysis here
                   </p>
                 </div>
-                <div className="flex gap-4 text-xs text-white/50">
-                  <div className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                    Text Extraction
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                    AI Analysis
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                    Image Description
-                  </div>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </main>
 
       <style>{`
-        .glassmorphism {
-          background: rgba(43, 27, 61, 0.5);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(128, 19, 236, 0.2);
-        }
-        .material-symbols-outlined {
-          font-family: 'Material Symbols Outlined';
-          font-weight: normal;
-          font-style: normal;
-          font-size: 24px;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Product+Sans:wght@300;400;500;700&display=swap');
       `}</style>
     </div>
   );

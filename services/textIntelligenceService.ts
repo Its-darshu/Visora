@@ -188,37 +188,36 @@ export const generateContent = async (
 ): Promise<ContentGeneration> => {
   try {
     const lengthWords = {
-      short: '100-200 words',
-      medium: '300-500 words',
-      long: '600-1000 words'
+      short: '2-4 sentences (20-50 words)',
+      medium: '100-200 words',
+      long: '300-500 words'
     };
 
-    const generationPrompt = `Generate content with the following requirements:
+    const generationPrompt = `${prompt}
 
-Prompt: ${prompt}
-Style: ${style}
-Tone: ${tone}
-Length: ${lengthWords[length]}
+Response requirements:
+- Style: ${style}
+- Tone: ${tone}
+- Length: ${lengthWords[length]}
+${length === 'short' ? '\n- KEEP IT BRIEF - Match the user\'s message length\n- NO long explanations unless specifically asked\n- Be conversational like texting' : ''}
 
-Provide the generated content along with metadata.
-
-Format as JSON: {
-  "content": string,
-  "style": string,
-  "tone": string,
-  "wordCount": number
-}`;
+Provide ONLY the response content in natural language.
+NO markdown formatting, NO special symbols, NO structured JSON.
+Just write the response naturally.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: generationPrompt,
-      config: {
-        responseMimeType: 'application/json',
-      }
     });
 
-    const jsonText = response.text.trim();
-    return JSON.parse(jsonText) as ContentGeneration;
+    const content = response.text.trim();
+    
+    return {
+      content: content,
+      style: style,
+      tone: tone,
+      wordCount: content.split(/\s+/).length
+    };
   } catch (error) {
     console.error('Content generation failed:', error);
     throw new Error('Failed to generate content. Please try again.');

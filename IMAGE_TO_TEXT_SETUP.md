@@ -1,4 +1,4 @@
-# Image-to-Text Feature Setup Guide
+  # Image-to-Text Feature Setup Guide
 
 ## 📋 Overview
 The Image-to-Text feature has been successfully integrated into Visora! It allows users to:

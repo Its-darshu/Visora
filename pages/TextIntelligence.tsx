@@ -1,422 +1,359 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { textIntelligenceService } from '../services/textIntelligenceService';
-import LoadingSpinner from '../components/LoadingSpinner';
+
+// Figma assets
+const imgProfile = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
+const imgMaterialSymbolsMic = "http://localhost:3845/assets/ab77041ce23a001b94fff29d324ed7489a7b576a.svg";
+const imgMaterialSymbolsUpload = "http://localhost:3845/assets/557bb38354a7d4486fce8183544baab7eb2b20ad.svg";
+const imgMingcuteArrowUpFill = "http://localhost:3845/assets/d70bec6c72191b8579a099650b0e19ac3297b32a.svg";
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+  image?: string;
+}
 
 const TextIntelligence: React.FC = () => {
+  const navigate = useNavigate();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [activeFeature, setActiveFeature] = useState<
-    'summarize' | 'sentiment' | 'entities' | 'generate' | 'keywords'
-  >('summarize');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Generation options
-  const [genStyle, setGenStyle] = useState<'professional' | 'casual' | 'academic' | 'creative'>('professional');
-  const [genTone, setGenTone] = useState<'formal' | 'friendly' | 'persuasive' | 'informative'>('informative');
-  const [genLength, setGenLength] = useState<'short' | 'medium' | 'long'>('medium');
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const handleProcess = async () => {
-    if (!inputText.trim()) {
-      setError('Please enter some text to process');
-      return;
-    }
+  const handleSendMessage = async () => {
+    if (!inputText.trim() && !selectedImage) return;
 
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: inputText,
+      sender: 'user',
+      timestamp: new Date(),
+      image: selectedImage ? URL.createObjectURL(selectedImage) : undefined
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const userPrompt = inputText;
+    setInputText('');
+    setSelectedImage(null);
     setIsProcessing(true);
-    setError(null);
-    setResult(null);
 
     try {
-      switch (activeFeature) {
-        case 'summarize':
-          const summary = await textIntelligenceService.summarizeText(inputText);
-          setResult(summary);
-          break;
-        case 'sentiment':
-          const sentiment = await textIntelligenceService.analyzeSentiment(inputText);
-          setResult(sentiment);
-          break;
-        case 'entities':
-          const entities = await textIntelligenceService.extractEntities(inputText);
-          setResult(entities);
-          break;
-        case 'generate':
-          const generated = await textIntelligenceService.generateContent(
-            inputText,
-            genStyle,
-            genTone,
-            genLength
-          );
-          setResult(generated);
-          break;
-        case 'keywords':
-          const keywords = await textIntelligenceService.generateKeywords(inputText);
-          setResult({ keywords });
-          break;
-      }
-    } catch (err) {
-      console.error('Processing error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process text');
+      // Build conversation context from recent messages
+      const recentMessages = messages.slice(-6); // Last 3 exchanges
+      const conversationContext = recentMessages
+        .map(msg => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`)
+        .join('\n');
+
+      // Create a conversational prompt with context
+      const contextualPrompt = `You are VISORA's friendly AI assistant in a chat conversation. 
+
+Previous conversation:
+${conversationContext}
+
+Current user message: ${userPrompt}
+
+IMPORTANT INSTRUCTIONS:
+- Keep your response SHORT and CONVERSATIONAL (2-4 sentences max)
+- Match the length of the user's message - short question = short answer
+- Be natural and friendly like texting a friend
+- NO markdown formatting (no ##, **, bullets)
+- NO long paragraphs or essays
+- If asked something simple, give a simple answer
+- If it's a follow-up question, reference the previous conversation
+- Use natural language, not formal writing
+
+Respond briefly and naturally:`;
+
+      const response = await textIntelligenceService.generateContent(
+        contextualPrompt,
+        'casual',
+        'friendly',
+        'short'
+      );
+      
+      // Clean up any markdown formatting that might slip through
+      let cleanResponse = response.content || "I'm here to help! What would you like to know?";
+      cleanResponse = cleanResponse.replace(/#{1,6}\s/g, ''); // Remove markdown headers
+      cleanResponse = cleanResponse.replace(/\*\*/g, ''); // Remove bold
+      cleanResponse = cleanResponse.replace(/\*/g, ''); // Remove italic
+      cleanResponse = cleanResponse.replace(/^\d+\.\s/gm, ''); // Remove numbered lists
+      cleanResponse = cleanResponse.replace(/^[-•]\s/gm, ''); // Remove bullet points
+      
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: cleanResponse,
+        sender: 'bot',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Fallback response if service fails
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, I had trouble processing that. Could you try asking again?",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const features = [
-    { id: 'summarize', icon: '📝', name: 'Summarize', color: 'blue' },
-    { id: 'sentiment', icon: '😊', name: 'Sentiment', color: 'green' },
-    { id: 'entities', icon: '🏷️', name: 'Entities', color: 'purple' },
-    { id: 'generate', icon: '✨', name: 'Generate', color: 'orange' },
-    { id: 'keywords', icon: '🔑', name: 'Keywords', color: 'pink' },
-  ];
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-slate-800 mb-3">
-            💬 Text Intelligence
-          </h1>
-          <p className="text-lg text-slate-600">
-            Advanced NLP tools for text analysis, summarization, and generation
-          </p>
+    <div className="min-h-screen bg-white relative overflow-x-hidden">
+      {/* Header */}
+      <header className="flex items-center p-1.5 gap-2">
+        {/* Logo */}
+        <div 
+          className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
+          onClick={() => navigate('/')}
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+        >
+          <h1 className="text-[40px] font-bold text-black">VISORA</h1>
         </div>
 
-        {/* Feature Selector */}
-        <div className="mb-8">
-          <div className="flex flex-wrap gap-3 justify-center">
-            {features.map((feature) => (
+        {/* Navigation Bar */}
+        <nav 
+          className="bg-[#e07400] border border-black flex items-center justify-center gap-0 h-[89px] flex-1 overflow-hidden"
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+        >
+          <button
+            onClick={() => navigate('/visual-intelligence')}
+            className="border border-black px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">VISUAL AI</span>
+          </button>
+          <button
+            onClick={() => navigate('/generate-image')}
+            className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">GENERATE</span>
+          </button>
+          <button
+            onClick={() => navigate('/enhance-edit')}
+            className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">AI STUDIO</span>
+          </button>
+          <button
+            onClick={() => navigate('/text-intelligence')}
+            className="bg-[#523bb5] border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-[#6347d6] transition-colors flex items-center justify-center"
+            style={{ textShadow: '#000000 2px 2px 0px' }}
+          >
+            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">CHAT</span>
+          </button>
+        </nav>
+
+        {/* Profile Dropdown */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="h-[89px] w-[182px] flex items-center justify-center"
+            style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
+          >
+            <img src={imgProfile} alt="Profile" className="w-full h-full object-contain" />
+          </button>
+          {showProfileMenu && (
+            <div className="absolute right-0 top-full mt-2 bg-white border border-black z-50 min-w-[180px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
               <button
-                key={feature.id}
-                onClick={() => setActiveFeature(feature.id as any)}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-                  activeFeature === feature.id
-                    ? `bg-${feature.color}-600 text-white shadow-lg scale-105`
-                    : 'bg-white text-slate-700 hover:shadow-md'
-                }`}
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  navigate('/settings');
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-100 border-b border-black text-black"
+                style={{ fontFamily: "'Silkscreen', monospace" }}
               >
-                <span className="mr-2">{feature.icon}</span>
-                {feature.name}
+                Settings
               </button>
-            ))}
-          </div>
+              <button
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  // Add logout logic here
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-100 text-black"
+                style={{ fontFamily: "'Silkscreen', monospace" }}
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input Section */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-2xl font-semibold text-slate-800 mb-4">
-                {activeFeature === 'generate' ? '💡 Your Prompt' : '📄 Input Text'}
-              </h2>
-              
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder={
-                  activeFeature === 'generate'
-                    ? 'Enter your prompt (e.g., "Write about the benefits of AI in education")'
-                    : 'Paste or type your text here...'
-                }
-                className="w-full h-64 p-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none resize-none font-mono text-sm"
-              />
-              
-              <div className="mt-4 text-sm text-slate-500">
-                Words: {inputText.split(/\s+/).filter(w => w.length > 0).length} | 
-                Characters: {inputText.length}
-              </div>
+      {/* Main Content */}
+      <main className="flex flex-col lg:flex-row gap-4 p-4 mt-4">
+        {/* Left Sidebar - History */}
+        <aside 
+          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4"
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+        >
+          <h2 className="text-[20px] text-black text-center">HISTORY</h2>
+          <div className="bg-white border border-black h-[44px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}></div>
+        </aside>
 
-              {/* Generation Options */}
-              {activeFeature === 'generate' && (
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Style
-                    </label>
-                    <select
-                      value={genStyle}
-                      onChange={(e) => setGenStyle(e.target.value as any)}
-                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="professional">Professional</option>
-                      <option value="casual">Casual</option>
-                      <option value="academic">Academic</option>
-                      <option value="creative">Creative</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Tone
-                    </label>
-                    <select
-                      value={genTone}
-                      onChange={(e) => setGenTone(e.target.value as any)}
-                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="formal">Formal</option>
-                      <option value="friendly">Friendly</option>
-                      <option value="persuasive">Persuasive</option>
-                      <option value="informative">Informative</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Length
-                    </label>
-                    <select
-                      value={genLength}
-                      onChange={(e) => setGenLength(e.target.value as any)}
-                      className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="short">Short (100-200 words)</option>
-                      <option value="medium">Medium (300-500 words)</option>
-                      <option value="long">Long (600-1000 words)</option>
-                    </select>
+        {/* Center Content */}
+        <div className="flex-1 flex flex-col gap-4">
+          {/* Description Banner */}
+          <div 
+            className="bg-[#79d7a8] border border-black p-4"
+            style={{ fontFamily: "'Product Sans', sans-serif", fontWeight: 300, boxShadow: '5px 5px 0px 0px #000000' }}
+          >
+            <p className="text-[18px] md:text-[24px] text-black">
+              Turn visuals into words. VISORA's Visual AI analyzes your image and generates clear, detailed text descriptions in seconds.
+            </p>
+          </div>
+
+          {/* Chat Container */}
+          <div 
+            className="bg-white border-4 border-black flex flex-col"
+            style={{ boxShadow: '5px 5px 0px 0px #000000', height: '587px' }}
+          >
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(587px - 100px)' }}>
+              {messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <p className="text-[24px] text-gray-400" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                      Start a conversation...
+                    </p>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[70%] p-4 border border-black ${
+                          message.sender === 'user' ? 'bg-[#d3e4ff]' : 'bg-[#f0f0f0]'
+                        }`}
+                        style={{ fontFamily: "'Product Sans', sans-serif", boxShadow: '3px 3px 0px 0px #000000' }}
+                      >
+                        {message.image && (
+                          <img src={message.image} alt="Uploaded" className="max-w-full mb-2 rounded" />
+                        )}
+                        <p className="text-black">{message.text}</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {isProcessing && (
+                    <div className="flex justify-start">
+                      <div className="bg-[#f0f0f0] p-4 border border-black" style={{ boxShadow: '3px 3px 0px 0px #000000' }}>
+                        <p className="text-black" style={{ fontFamily: "'Product Sans', sans-serif" }}>
+                          Typing...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
               )}
+            </div>
 
+            {/* Input Area */}
+            <div className="p-4 flex gap-2 items-end border-t-2 border-black">
+              {/* Text Input */}
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 h-[60px] px-4 border-2 border-black focus:outline-none"
+                style={{ fontFamily: "'Product Sans', sans-serif" }}
+              />
+
+              {/* Mic Button */}
               <button
-                onClick={handleProcess}
-                disabled={isProcessing || !inputText.trim()}
-                className="mt-6 w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="bg-[#d3e5ff] border-2 border-black h-[60px] w-[84px] flex items-center justify-center hover:bg-[#c0d4ef] transition-colors"
+                title="Voice Input"
               >
-                {isProcessing ? (
-                  <>
-                    <i className="fa-solid fa-spinner fa-spin"></i>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <i className="fa-solid fa-wand-magic-sparkles"></i>
-                    Process Text
-                  </>
-                )}
+                <img src={imgMaterialSymbolsMic} alt="Mic" className="w-[44px] h-[44px]" />
+              </button>
+
+              {/* Upload Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-[#d3e4ff] border-2 border-black h-[60px] w-[84px] flex items-center justify-center hover:bg-[#c0d4ef] transition-colors"
+                title="Upload Image"
+              >
+                <img src={imgMaterialSymbolsUpload} alt="Upload" className="w-[44px] h-[44px]" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+
+              {/* Send Button */}
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputText.trim() && !selectedImage}
+                className="bg-[#c5b5ff] border-2 border-black h-[60px] w-[84px] flex items-center justify-center hover:bg-[#b3a0ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Send"
+              >
+                <img src={imgMingcuteArrowUpFill} alt="Send" className="w-[44px] h-[44px]" />
               </button>
             </div>
 
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
-                <p className="text-red-700 font-semibold">⚠️ {error}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Results Section */}
-          <div className="space-y-6">
-            {result ? (
-              <div className="space-y-4">
-                {/* Summarize Results */}
-                {activeFeature === 'summarize' && (
-                  <>
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                        📝 Summary
-                      </h3>
-                      <p className="text-slate-700 leading-relaxed">{result.summary}</p>
-                    </div>
-                    
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                        🔑 Key Points
-                      </h3>
-                      <ul className="space-y-2">
-                        {result.keyPoints.map((point: string, idx: number) => (
-                          <li key={idx} className="text-slate-700 flex items-start gap-2">
-                            <i className="fa-solid fa-check text-green-500 mt-1"></i>
-                            <span>{point}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                        📊 Statistics
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {result.wordCount.original}
-                          </div>
-                          <div className="text-sm text-slate-600">Original Words</div>
-                        </div>
-                        <div className="bg-green-50 p-4 rounded-lg">
-                          <div className="text-2xl font-bold text-green-600">
-                            {result.wordCount.summary}
-                          </div>
-                          <div className="text-sm text-slate-600">Summary Words</div>
-                        </div>
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {result.readingTime.original} min
-                          </div>
-                          <div className="text-sm text-slate-600">Original Time</div>
-                        </div>
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <div className="text-2xl font-bold text-orange-600">
-                            {result.readingTime.summary} min
-                          </div>
-                          <div className="text-sm text-slate-600">Summary Time</div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Sentiment Results */}
-                {activeFeature === 'sentiment' && (
-                  <>
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                        😊 Overall Sentiment
-                      </h3>
-                      <div className="flex items-center gap-4">
-                        <div className={`text-5xl ${
-                          result.overall === 'positive' ? 'text-green-500' :
-                          result.overall === 'negative' ? 'text-red-500' :
-                          result.overall === 'mixed' ? 'text-yellow-500' :
-                          'text-slate-400'
-                        }`}>
-                          {result.overall === 'positive' ? '😊' :
-                           result.overall === 'negative' ? '😞' :
-                           result.overall === 'mixed' ? '😐' : '😶'}
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-2xl font-bold capitalize">{result.overall}</div>
-                          <div className="text-sm text-slate-500">Score: {result.score.toFixed(2)}</div>
-                          <div className="mt-2 bg-slate-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${
-                                result.score > 0 ? 'bg-green-500' : 'bg-red-500'
-                              }`}
-                              style={{ width: `${Math.abs(result.score) * 50 + 50}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                        ❤️ Emotions Detected
-                      </h3>
-                      <div className="space-y-3">
-                        {result.emotions.map((emotion: any, idx: number) => (
-                          <div key={idx}>
-                            <div className="flex justify-between mb-1">
-                              <span className="font-medium capitalize">{emotion.name}</span>
-                              <span className="text-slate-600">{emotion.intensity}%</span>
-                            </div>
-                            <div className="bg-slate-200 rounded-full h-2">
-                              <div
-                                className="bg-purple-500 h-2 rounded-full"
-                                style={{ width: `${emotion.intensity}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Entities Results */}
-                {activeFeature === 'entities' && (
-                  <>
-                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                        🏷️ Extracted Entities
-                      </h3>
-                      <div className="space-y-2">
-                        {result.entities.map((entity: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <div>
-                              <div className="font-semibold">{entity.text}</div>
-                              <div className="text-sm text-slate-500 capitalize">{entity.type}</div>
-                            </div>
-                            <div className="text-sm font-medium text-purple-600">
-                              {entity.relevance}%
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {result.relationships.length > 0 && (
-                      <div className="bg-white rounded-2xl shadow-lg p-6">
-                        <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                          🔗 Relationships
-                        </h3>
-                        <div className="space-y-2">
-                          {result.relationships.map((rel: any, idx: number) => (
-                            <div key={idx} className="p-3 bg-blue-50 rounded-lg text-sm">
-                              <strong>{rel.entity1}</strong>
-                              <span className="mx-2 text-slate-500">→ {rel.relation} →</span>
-                              <strong>{rel.entity2}</strong>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Generate Results */}
-                {activeFeature === 'generate' && (
-                  <div className="bg-white rounded-2xl shadow-lg p-6">
-                    <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                      ✨ Generated Content
-                    </h3>
-                    <div className="prose max-w-none">
-                      <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                        {result.content}
-                      </p>
-                    </div>
-                    <div className="mt-4 flex gap-4 text-sm text-slate-500">
-                      <span>Style: <strong>{result.style}</strong></span>
-                      <span>Tone: <strong>{result.tone}</strong></span>
-                      <span>Words: <strong>{result.wordCount}</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Keywords Results */}
-                {activeFeature === 'keywords' && (
-                  <div className="bg-white rounded-2xl shadow-lg p-6">
-                    <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                      🔑 Keywords & Tags
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {result.keywords.map((keyword: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="bg-gradient-to-r from-pink-100 to-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium"
-                        >
-                          {keyword}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-                <div className="text-6xl mb-4">🤖</div>
-                <h3 className="text-xl font-semibold text-slate-700 mb-2">
-                  Ready to Process
-                </h3>
-                <p className="text-slate-500">
-                  Enter your text and click "Process Text" to see AI-powered analysis
-                </p>
+            {selectedImage && (
+              <div className="px-4 pb-2 flex items-center gap-2">
+                <span className="text-sm text-black">Image attached: {selectedImage.name}</span>
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="text-sm text-red-600 underline"
+                >
+                  Remove
+                </button>
               </div>
             )}
           </div>
         </div>
-      </div>
+      </main>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Product+Sans:wght@300;400;500;700&display=swap');
+      `}</style>
     </div>
   );
 };

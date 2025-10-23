@@ -2,29 +2,31 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
+// Figma asset URLs
+const imgImage15 = "http://localhost:3845/assets/f091c566b8c9673bd703afd284b3acadc868c78a.png";
+const imgImage16 = "http://localhost:3845/assets/29ef1653c6c50bcf1367970eb4e4ed8cd71a70c5.png";
+const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
+const imgVector3 = "http://localhost:3845/assets/2d98a8cff21a2135098ff5519bad6ad96e5ac270.svg";
+
 const AuthPage: React.FC = () => {
-  const [isSignUp, setIsSignUp] = useState(true);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [formData, setFormData] = useState({
-    fullName: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    agreeToTerms: false
+    confirmPassword: ''
   });
 
   const { loginWithGoogle, signup, login } = useAuth();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
@@ -48,10 +50,6 @@ const AuthPage: React.FC = () => {
 
     if (isSignUp) {
       // Validation for sign up
-      if (!formData.fullName.trim()) {
-        setError('Please enter your full name');
-        return;
-      }
       if (!formData.email.trim()) {
         setError('Please enter your email address');
         return;
@@ -64,14 +62,12 @@ const AuthPage: React.FC = () => {
         setError('Passwords do not match');
         return;
       }
-      if (!formData.agreeToTerms) {
-        setError('Please agree to the Terms and Privacy Policy');
-        return;
-      }
 
       setLoading(true);
       try {
-        await signup(formData.email, formData.password, formData.fullName);
+        // Extract username from email for display name
+        const displayName = formData.email.split('@')[0];
+        await signup(formData.email, formData.password, displayName);
         navigate('/visual-intelligence');
       } catch (err: any) {
         console.error('Signup error:', err);
@@ -102,220 +98,191 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex flex-col items-center justify-center w-1/2 bg-[#1a1122] p-12 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#2a1a3e] to-[#1a1122] opacity-50"></div>
-        
-        {/* Animated Background */}
-        <div className="absolute inset-0 z-0">
-          <svg height="100%" width="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style={{stopColor: 'rgba(127,19,236,0.2)', stopOpacity: 1}} />
-                <stop offset="100%" style={{stopColor: 'rgba(236,72,153,0)', stopOpacity: 1}} />
-              </linearGradient>
-              <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style={{stopColor: 'rgba(37,99,235,0.2)', stopOpacity: 1}} />
-                <stop offset="100%" style={{stopColor: 'rgba(37,99,235,0)', stopOpacity: 1}} />
-              </linearGradient>
-            </defs>
-            <rect fill="transparent" height="100%" width="100%" />
-            <path d="M0,150 Q200,50 400,150 T800,150" fill="none" stroke="url(#grad1)" strokeWidth="2">
-              <animate 
-                attributeName="d" 
-                dur="10s" 
-                repeatCount="indefinite" 
-                values="M0,150 Q200,50 400,150 T800,150; M0,150 Q200,250 400,150 T800,150; M0,150 Q200,50 400,150 T800,150"
-              />
-            </path>
-            <path d="M0,300 Q150,400 300,300 T600,300" fill="none" stroke="url(#grad2)" strokeWidth="2">
-              <animate 
-                attributeName="d" 
-                dur="12s" 
-                repeatCount="indefinite" 
-                values="M0,300 Q150,400 300,300 T600,300; M0,300 Q150,200 300,300 T600,300; M0,300 Q150,400 300,300 T600,300"
-              />
-            </path>
-          </svg>
-        </div>
-
-        <div className="relative z-10 flex flex-col items-center text-center">
-          <h1 className="text-5xl font-bold mb-4">Visora</h1>
-          <p className="text-xl text-gray-300">See. Understand. Create.</p>
-        </div>
+    <div className="relative flex min-h-screen w-full bg-white overflow-hidden">
+      {/* Left Panel - Illustration */}
+      <div className="hidden lg:flex lg:w-[40%] relative items-start justify-start overflow-hidden">
+        <img 
+          src={imgImage15} 
+          alt="Student illustration" 
+          className="h-[775px] w-[565px] object-cover"
+          style={{ marginLeft: '-29px', marginTop: '0px' }}
+        />
       </div>
 
       {/* Right Panel - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-[#191022]">
-        <div className="w-full max-w-md">
-          <div className="bg-white/5 backdrop-blur-xl rounded-xl shadow-2xl p-8 border border-white/10">
-            <div className="flex flex-col items-center">
-              <p className="text-white text-3xl font-black mb-8 text-center">
-                {isSignUp ? 'Create Your Visora Account' : 'Welcome Back to Visora'}
-              </p>
+      <div className="w-full lg:w-[60%] flex items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-[505px]">
+          <div className="flex flex-col items-center gap-6">
+            {/* Title */}
+            <h1 
+              className="text-[48px] text-black text-center leading-tight"
+              style={{ fontFamily: "'Silkscreen', monospace" }}
+            >
+              {isSignUp ? 'WELCOME ! GET STARTED' : 'WELCOME'}
+            </h1>
 
-              {error && (
-                <div className="w-full bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg mb-6">
-                  <div className="flex items-center">
-                    <span className="material-symbols-outlined mr-2">error</span>
-                    <span className="text-sm">{error}</span>
+            {error && (
+              <div className="w-full bg-red-100 border-2 border-red-500 text-red-700 px-4 py-3">
+                <p className="text-sm" style={{ fontFamily: "'Silkscreen', monospace" }}>{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
+              {/* Email Field */}
+              <div className="flex flex-col gap-1.5">
+                <label 
+                  className="text-[24px] text-black"
+                  style={{ fontFamily: "'Silkscreen', monospace" }}
+                >
+                  EMAIL
+                </label>
+                <div className="relative overflow-hidden" style={{ filter: 'drop-shadow(5px 4px 0px #000000)' }}>
+                  <input
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full h-[66px] bg-black text-white px-4 focus:outline-none"
+                    style={{ 
+                      fontFamily: "'Silkscreen', monospace"
+                    }}
+                  />
+                  <div 
+                    className="absolute top-0 right-0 bottom-0 w-[150px] pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(to left, #ffa500 0%, rgba(255, 165, 0, 0.8) 40%, transparent 100%)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="flex flex-col gap-1.5">
+                <label 
+                  className="text-[24px] text-black"
+                  style={{ fontFamily: "'Silkscreen', monospace" }}
+                >
+                  PASSWORD
+                </label>
+                <div className="relative overflow-hidden" style={{ filter: 'drop-shadow(5px 4px 0px #000000)' }}>
+                  <input
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="w-full h-[66px] bg-black text-white px-4 focus:outline-none"
+                    style={{ 
+                      fontFamily: "'Silkscreen', monospace"
+                    }}
+                  />
+                  <div 
+                    className="absolute top-0 right-0 bottom-0 w-[150px] pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(to left, #ffa500 0%, rgba(255, 165, 0, 0.8) 40%, transparent 100%)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Confirm Password Field - Only for Sign Up */}
+              {isSignUp && (
+                <div className="flex flex-col gap-1.5">
+                  <label 
+                    className="text-[24px] text-black"
+                    style={{ fontFamily: "'Silkscreen', monospace" }}
+                  >
+                    CONFIRM PASSWORD
+                  </label>
+                  <div className="relative overflow-hidden" style={{ filter: 'drop-shadow(5px 4px 0px #000000)' }}>
+                    <input
+                      name="confirmPassword"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className="w-full h-[66px] bg-black text-white px-4 focus:outline-none"
+                      style={{ 
+                        fontFamily: "'Silkscreen', monospace"
+                      }}
+                    />
+                    <div 
+                      className="absolute top-0 right-0 bottom-0 w-[150px] pointer-events-none"
+                      style={{
+                        background: 'linear-gradient(to left, #ffa500 0%, rgba(255, 165, 0, 0.8) 40%, transparent 100%)'
+                      }}
+                    />
                   </div>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="w-full space-y-6">
-                {isSignUp && (
-                  <div>
-                    <label className="flex flex-col min-w-40 flex-1">
-                      <p className="text-white text-sm font-medium leading-normal pb-2">Full Name</p>
-                      <input
-                        name="fullName"
-                        value={formData.fullName}
-                        onChange={handleInputChange}
-                        className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#7f13ec]/50 border border-white/10 bg-[#362348]/50 h-14 placeholder:text-[#ad92c9]/70 p-4 text-base font-normal leading-normal transition-all"
-                        placeholder="Enter your full name"
-                      />
-                    </label>
-                  </div>
-                )}
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="relative w-full h-[66px] bg-black text-white overflow-hidden hover:bg-gray-900 transition-colors disabled:opacity-50"
+                style={{ 
+                  boxShadow: '5px 5px 0px 0px #000000',
+                  fontFamily: "'Silkscreen', monospace"
+                }}
+              >
+                <span className="relative z-10 text-[36px]">
+                  {loading ? 'LOADING...' : 'SUBMIT'}
+                </span>
+                <div 
+                  className="absolute top-0 right-0 bottom-0 w-[150px] pointer-events-none"
+                  style={{
+                    background: 'linear-gradient(to left, #ffa500 0%, rgba(255, 165, 0, 0.8) 40%, transparent 100%)'
+                  }}
+                />
+              </button>
 
-                <div>
-                  <label className="flex flex-col min-w-40 flex-1">
-                    <p className="text-white text-sm font-medium leading-normal pb-2">Email Address</p>
-                    <input
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#7f13ec]/50 border border-white/10 bg-[#362348]/50 h-14 placeholder:text-[#ad92c9]/70 p-4 text-base font-normal leading-normal transition-all"
-                      placeholder="Enter your email address"
-                    />
-                  </label>
-                </div>
+              {/* OR Divider */}
+              <p 
+                className="text-[24px] text-black text-center"
+                style={{ fontFamily: "'Silkscreen', monospace" }}
+              >
+                OR
+              </p>
 
-                <div>
-                  <label className="flex flex-col min-w-40 flex-1">
-                    <p className="text-white text-sm font-medium leading-normal pb-2">Password</p>
-                    <div className="flex w-full flex-1 items-stretch rounded-lg border border-white/10 focus-within:ring-2 focus-within:ring-[#7f13ec]/50 transition-all">
-                      <input
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden text-white focus:outline-none border-none bg-[#362348]/50 h-14 placeholder:text-[#ad92c9]/70 p-4 rounded-l-lg text-base font-normal leading-normal"
-                        placeholder="Enter your password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-[#ad92c9] flex bg-[#362348]/50 items-center justify-center px-4 rounded-r-lg hover:text-white transition-colors"
-                      >
-                        <span className="material-symbols-outlined">
-                          {showPassword ? 'visibility' : 'visibility_off'}
-                        </span>
-                      </button>
-                    </div>
-                  </label>
-                </div>
+              {/* Google Sign In Button */}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="relative w-full h-[66px] bg-black text-white overflow-hidden hover:bg-gray-900 transition-colors disabled:opacity-50 flex items-center justify-center gap-6"
+                style={{ 
+                  boxShadow: '5px 5px 0px 0px #000000',
+                  fontFamily: "'Silkscreen', monospace"
+                }}
+              >
+                <img src={imgImage16} alt="Google" className="w-[55px] h-[55px] z-10" />
+                <span className="text-[20px] z-10">SIGNUP WITH GOOGLE</span>
+                <div 
+                  className="absolute top-0 right-0 bottom-0 w-[180px] pointer-events-none"
+                  style={{
+                    background: 'linear-gradient(to left, #ffa500 0%, rgba(255, 165, 0, 0.8) 40%, transparent 100%)'
+                  }}
+                />
+              </button>
 
-                {isSignUp && (
-                  <div>
-                    <label className="flex flex-col min-w-40 flex-1">
-                      <p className="text-white text-sm font-medium leading-normal pb-2">Confirm Password</p>
-                      <div className="flex w-full flex-1 items-stretch rounded-lg border border-white/10 focus-within:ring-2 focus-within:ring-[#7f13ec]/50 transition-all">
-                        <input
-                          name="confirmPassword"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={formData.confirmPassword}
-                          onChange={handleInputChange}
-                          className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden text-white focus:outline-none border-none bg-[#362348]/50 h-14 placeholder:text-[#ad92c9]/70 p-4 rounded-l-lg text-base font-normal leading-normal"
-                          placeholder="Confirm your password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="text-[#ad92c9] flex bg-[#362348]/50 items-center justify-center px-4 rounded-r-lg hover:text-white transition-colors"
-                        >
-                          <span className="material-symbols-outlined">
-                            {showConfirmPassword ? 'visibility' : 'visibility_off'}
-                          </span>
-                        </button>
-                      </div>
-                    </label>
-                  </div>
-                )}
-
-                {isSignUp && (
-                  <div className="flex items-start">
-                    <div className="flex items-center h-5">
-                      <input
-                        name="agreeToTerms"
-                        checked={formData.agreeToTerms}
-                        onChange={handleInputChange}
-                        type="checkbox"
-                        className="w-4 h-4 border border-gray-600 rounded bg-gray-700 focus:ring-3 focus:ring-[#7f13ec] ring-offset-gray-800"
-                      />
-                    </div>
-                    <div className="ml-3 text-sm">
-                      <label className="font-light text-gray-400">
-                        I agree to the <a className="font-medium text-[#7f13ec] hover:underline cursor-pointer">Terms and Privacy Policy</a>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full text-white bg-gradient-to-r from-[#7f13ec] to-fuchsia-600 hover:bg-gradient-to-l focus:ring-4 focus:outline-none focus:ring-[#7f13ec]/50 font-medium rounded-lg text-sm px-5 py-3.5 text-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                      <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
-                    </div>
-                  ) : (
-                    <span>{isSignUp ? 'Sign Up' : 'Sign In'}</span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full text-white bg-transparent border border-gray-600 hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-gray-800 font-medium rounded-lg text-sm px-5 py-3.5 text-center flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 18 19" xmlns="http://www.w3.org/2000/svg">
-                    <path clipRule="evenodd" d="M8.842 18.083a8.8 8.8 0 0 1-8.65-8.948 8.841 8.841 0 0 1 8.8-8.652h.153a8.464 8.464 0 0 1 5.7 2.257l-2.193 2.038A5.27 5.27 0 0 0 9.09 3.4a5.882 5.882 0 0 0-5.2 5.74.5.5 0 0 1-1.02.055 6.882 6.882 0 0 1 6.22-6.218 6.945 6.945 0 0 1 6.885 6.885.5.5 0 0 1-.482.551A5.591 5.591 0 0 0 9.09 14.5a5.9 5.9 0 0 0 5.66-4.664H9.23a.5.5 0 0 1 0-1h6.36a.5.5 0 0 1 .5.5 6.923 6.923 0 0 1-2.015 4.93A8.464 8.464 0 0 1 9.09 18.1Z" fillRule="evenodd"/>
-                  </svg>
-                  Continue with Google
-                </button>
-
-                <p className="text-sm font-light text-gray-400 text-center">
-                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSignUp(!isSignUp);
-                      setError('');
-                    }}
-                    className="font-medium text-[#7f13ec] hover:underline"
-                  >
-                    {isSignUp ? 'Sign in here' : 'Sign up here'}
-                  </button>
-                </p>
-              </form>
-            </div>
+              {/* Toggle Sign Up / Sign In */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError('');
+                }}
+                className="text-[24px] text-black text-center hover:underline"
+                style={{ fontFamily: "'Silkscreen', monospace" }}
+              >
+                {isSignUp ? "ALL HAVE AN ACCOUNT? LOGIN" : "DON'T HAVE ACCOUNT? SIGNUP"}
+              </button>
+            </form>
           </div>
         </div>
       </div>
 
       <style>{`
-        .material-symbols-outlined {
-          font-family: 'Material Symbols Outlined';
-          font-size: 20px;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
       `}</style>
     </div>
   );
