@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { textIntelligenceService } from '../services/textIntelligenceService';
+import { firestoreService } from '../services/firestoreService';
+import { storageService } from '../services/storageService';
+import { useChatHistory } from '../services/useHistory';
+import { Timestamp } from 'firebase/firestore';
 
 // Figma assets
 const imgProfile = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
@@ -18,11 +23,14 @@ interface Message {
 
 const TextIntelligence: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
+  const { sessions, loading: historyLoading, loadSessions } = useChatHistory();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,11 +51,75 @@ const TextIntelligence: React.FC = () => {
 
     setMessages(prev => [...prev, userMessage]);
     const userPrompt = inputText;
+    const uploadedFile = selectedImage;
     setInputText('');
     setSelectedImage(null);
     setIsProcessing(true);
 
     try {
+      let finalPrompt = userPrompt;
+      
+      // If PDF is uploaded, extract text first
+      if (uploadedFile && uploadedFile.type === 'application/pdf') {
+        try {
+          console.log('📄 Extracting text from PDF...');
+          const formData = new FormData();
+          formData.append('file', uploadedFile);
+          
+          const pdfResponse = await fetch('http://localhost:5000/api/extract-pdf', {
+            method: 'POST',
+            body: formData
+          });
+          
+          const pdfData = await pdfResponse.json();
+          
+          if (pdfData.success && pdfData.text) {
+            console.log(`✅ PDF text extracted: ${pdfData.pages} pages, ${pdfData.wordCount} words`);
+            
+            // Create comprehensive prompt with PDF content for deep analysis
+            finalPrompt = `I have uploaded a PDF document titled "${pdfData.filename}" with the following complete content:
+
+📄 DOCUMENT DETAILS:
+- Pages: ${pdfData.pages}
+- Words: ${pdfData.wordCount}
+- Characters: ${pdfData.charCount}
+
+==== FULL PDF CONTENT START ====
+${pdfData.text}
+==== FULL PDF CONTENT END ====
+
+ANALYSIS REQUEST:
+${userPrompt}
+
+INSTRUCTIONS FOR COMPREHENSIVE ANALYSIS:
+1. Read and analyze the ENTIRE document content provided above
+2. Reference specific sections, chapters, pages, or key points from the PDF
+3. Provide detailed, thorough answers based on the complete document
+4. If creating questions, ensure they cover the full scope of all ${pdfData.pages} pages
+5. If summarizing, capture ALL major topics, concepts, and details from the entire document
+6. Use bullet points for listing key points
+7. Use numbered lists for steps or sequential information
+8. Include specific examples or quotes from the PDF when relevant
+9. Ensure your response demonstrates understanding of the complete document
+
+Please provide a comprehensive, well-structured response based on the entire PDF content above.`;
+          } else {
+            throw new Error(pdfData.error || 'Failed to extract PDF text');
+          }
+        } catch (pdfError) {
+          console.error('❌ PDF extraction failed:', pdfError);
+          const errorMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: "Sorry, I couldn't read the PDF file. Please make sure it's a text-based PDF, not a scanned image.",
+            sender: 'bot',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          setIsProcessing(false);
+          return;
+        }
+      }
+      
       // Build conversation context from recent messages
       const recentMessages = messages.slice(-6); // Last 3 exchanges
       const conversationContext = recentMessages
@@ -55,39 +127,52 @@ const TextIntelligence: React.FC = () => {
         .join('\n');
 
       // Create a conversational prompt with context
-      const contextualPrompt = `You are VISORA's friendly AI assistant in a chat conversation. 
+      const contextualPrompt = `You are VISORA's AI assistant, designed to help students learn and understand any topic.
 
 Previous conversation:
 ${conversationContext}
 
-Current user message: ${userPrompt}
+Current user message: ${finalPrompt}
 
-IMPORTANT INSTRUCTIONS:
-- Keep your response SHORT and CONVERSATIONAL (2-4 sentences max)
-- Match the length of the user's message - short question = short answer
-- Be natural and friendly like texting a friend
-- NO markdown formatting (no ##, **, bullets)
-- NO long paragraphs or essays
-- If asked something simple, give a simple answer
-- If it's a follow-up question, reference the previous conversation
-- Use natural language, not formal writing
+IMPORTANT FORMATTING INSTRUCTIONS:
+- Use bullet points (•) for listing items or key points
+- Use numbered lists (1., 2., 3.) for steps, procedures, or sequential information
+- Add line breaks between paragraphs for better readability
+- Use clear section headings when covering multiple topics
+- Break up long text into digestible chunks
+- Use proper spacing between different sections
+- For code snippets, ALWAYS wrap them in triple backticks with language name
+- Format: triple-backtick + language + newline + code + newline + triple-backtick
+- Example for Python: three backticks python newline code newline three backticks
 
-Respond briefly and naturally:`;
+CONTENT INSTRUCTIONS:
+- Provide comprehensive, detailed responses to help students learn
+- If asked for an essay, article, or detailed explanation, provide it in full
+- If asked for steps or "how-to", use numbered lists
+- If listing features, options, or points, use bullet points
+- Match the level of detail the student requests
+- Be educational, accurate, and thorough
+- Include examples when helpful
+- For technical topics, explain concepts clearly with depth
+
+Respond with well-formatted, easy-to-read content:`;
 
       const response = await textIntelligenceService.generateContent(
         contextualPrompt,
-        'casual',
-        'friendly',
-        'short'
+        'academic',
+        'informative',
+        'long'
       );
       
-      // Clean up any markdown formatting that might slip through
-      let cleanResponse = response.content || "I'm here to help! What would you like to know?";
-      cleanResponse = cleanResponse.replace(/#{1,6}\s/g, ''); // Remove markdown headers
-      cleanResponse = cleanResponse.replace(/\*\*/g, ''); // Remove bold
-      cleanResponse = cleanResponse.replace(/\*/g, ''); // Remove italic
-      cleanResponse = cleanResponse.replace(/^\d+\.\s/gm, ''); // Remove numbered lists
-      cleanResponse = cleanResponse.replace(/^[-•]\s/gm, ''); // Remove bullet points
+      // Convert markdown to readable format with proper line breaks
+      let cleanResponse = response.content || "I'm here to help you learn! What would you like to know?";
+      
+      // Preserve line breaks and formatting
+      cleanResponse = cleanResponse
+        .replace(/\n\n/g, '\n\n')  // Keep double line breaks
+        .replace(/\*\*/g, '')       // Remove bold markers but keep text
+        .replace(/#{1,6}\s/g, '')   // Remove markdown headers but keep text
+        .trim();
       
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -97,6 +182,74 @@ Respond briefly and naturally:`;
       };
 
       setMessages(prev => [...prev, botMessage]);
+      
+      // Save chat session to Firestore
+      if (currentUser) {
+        try {
+          console.log('💾 Saving chat session to database...');
+          
+          // Upload image if present
+          let imageUrl: string | undefined;
+          if (selectedImage) {
+            imageUrl = await storageService.uploadImage(
+              selectedImage,
+              currentUser.uid,
+              'chat'
+            );
+          }
+          
+          // Convert messages to Firestore format (omit undefined fields)
+          const userMessageData: any = {
+            role: 'user' as const,
+            content: userPrompt,
+            timestamp: Timestamp.fromDate(userMessage.timestamp)
+          };
+          
+          // Only add imageUrl if it exists
+          if (imageUrl) {
+            userMessageData.imageUrl = imageUrl;
+          }
+          
+          const newMessages = [
+            userMessageData,
+            {
+              role: 'assistant' as const,
+              content: cleanResponse,
+              timestamp: Timestamp.fromDate(botMessage.timestamp)
+            }
+          ];
+          
+          // Update or create session
+          if (currentSessionId) {
+            // Get existing session and append new messages
+            const existingSession = await firestoreService.getChatSession(currentSessionId);
+            if (existingSession) {
+              const allMessages = [...existingSession.messages, ...newMessages];
+              await firestoreService.updateChatSession(currentSessionId, allMessages);
+            }
+          } else {
+            const now = Timestamp.now();
+            const sessionId = await firestoreService.saveChatSession({
+              userId: currentUser.uid,
+              messages: newMessages,
+              createdAt: now,
+              lastMessageAt: now
+            });
+            setCurrentSessionId(sessionId);
+          }
+          
+          // Update API usage
+          await firestoreService.updateUserApiUsage(currentUser.uid, 'chatMessages');
+          
+          // Reload chat history
+          await loadSessions();
+          
+          console.log('✅ Chat session saved successfully!');
+        } catch (saveError) {
+          console.error('❌ Failed to save chat session:', saveError);
+          // Don't show error to user, chat was successful
+        }
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -116,8 +269,11 @@ Respond briefly and naturally:`;
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedImage(file);
+    if (file) {
+      // Accept both images and PDFs
+      if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+        setSelectedImage(file);
+      }
     }
   };
 
@@ -128,6 +284,100 @@ Respond briefly and naturally:`;
     }
   };
 
+  // Function to render message content with code blocks
+  const renderMessageContent = (text: string) => {
+    // Match code blocks with optional language: ```language\ncode```
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+    let key = 0;
+
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      // Add text before code block
+      if (match.index > lastIndex) {
+        const textBefore = text.substring(lastIndex, match.index);
+        parts.push(
+          <span key={`text-${key++}`} className="whitespace-pre-wrap">
+            {textBefore}
+          </span>
+        );
+      }
+
+      // Add code block
+      const language = match[1] || 'code';
+      const code = match[2].trim();
+      
+      // Function to highlight comments in code
+      const highlightCode = (codeText: string) => {
+        const lines = codeText.split('\n');
+        return lines.map((line, idx) => {
+          // Check if line is a comment (starts with #, //, /* or *)
+          const isComment = /^\s*(#|\/\/|\/\*|\*|<!--)/.test(line);
+          return (
+            <div key={idx}>
+              <span style={{ color: isComment ? '#00ff00' : '#98985B' }}>
+                {line}
+              </span>
+            </div>
+          );
+        });
+      };
+      
+      parts.push(
+        <div key={`code-${key++}`} className="my-3 w-full">
+          <div 
+            className="bg-[#33323B] border-2 border-black"
+            style={{ 
+              fontFamily: "'Silkscreen', monospace",
+              boxShadow: '5px 5px 0px 0px #000000'
+            }}
+          >
+            {/* Header with CODE TYPE and Copy button */}
+            <div className="bg-[#33323B] border-b-2 border-black px-4 py-2 flex items-center justify-between">
+              <span className="text-[14px] text-white font-bold uppercase">
+                CODE TYPE: {language}
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(code);
+                }}
+                className="bg-white text-black border border-black px-2 py-1 hover:bg-gray-200 transition-colors flex items-center gap-1"
+                style={{ boxShadow: '2px 2px 0px 0px #000000', fontFamily: "'Silkscreen', monospace" }}
+                title="Copy code"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span className="text-[10px] font-bold">COPY</span>
+              </button>
+            </div>
+            {/* Code content with custom styling */}
+            <div className="bg-[#33323B] p-4 overflow-x-auto">
+              <pre className="text-[13px] leading-relaxed" style={{ fontFamily: "'Courier New', 'Consolas', monospace" }}>
+                <code>{highlightCode(code)}</code>
+              </pre>
+            </div>
+          </div>
+        </div>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text after last code block
+    if (lastIndex < text.length) {
+      parts.push(
+        <span key={`text-${key++}`} className="whitespace-pre-wrap">
+          {text.substring(lastIndex)}
+        </span>
+      );
+    }
+
+    return parts.length > 0 ? parts : <span className="whitespace-pre-wrap">{text}</span>;
+  };
+
   return (
     <div className="min-h-screen bg-white relative overflow-x-hidden">
       {/* Header */}
@@ -135,7 +385,7 @@ Respond briefly and naturally:`;
         {/* Logo */}
         <div 
           className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/visual-intelligence')}
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <h1 className="text-[40px] font-bold text-black">VISORA</h1>
@@ -180,10 +430,28 @@ Respond briefly and naturally:`;
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="h-[89px] w-[182px] flex items-center justify-center"
+            className="h-[89px] w-[182px] flex items-center justify-center gap-3 px-4 bg-[#FFA500] border-2 border-black"
             style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
           >
-            <img src={imgProfile} alt="Profile" className="w-full h-full object-contain" />
+            <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
+              {currentUser?.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-[#ffb7ce]">
+                  <span className="text-2xl text-black" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    {currentUser?.displayName?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+              <path d="M7 10L12 15L17 10" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
           {showProfileMenu && (
             <div className="absolute right-0 top-full mt-2 bg-white border border-black z-50 min-w-[180px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
@@ -198,9 +466,10 @@ Respond briefly and naturally:`;
                 Settings
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowProfileMenu(false);
-                  // Add logout logic here
+                  await logout();
+                  navigate('/auth');
                 }}
                 className="w-full px-4 py-3 text-left hover:bg-gray-100 text-black"
                 style={{ fontFamily: "'Silkscreen', monospace" }}
@@ -220,7 +489,64 @@ Respond briefly and naturally:`;
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <h2 className="text-[20px] text-black text-center">HISTORY</h2>
-          <div className="bg-white border border-black h-[44px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}></div>
+          
+          {/* History List */}
+          <div className="flex flex-col gap-2 overflow-y-auto max-h-[600px] pr-2 pb-2">
+            {historyLoading ? (
+              <div className="text-center text-black text-[14px]">Loading...</div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center text-black text-[14px]">No chat history yet</div>
+            ) : (
+              sessions.map((session) => {
+                const firstMessage = session.messages?.[0]?.content || 'New conversation';
+                const preview = firstMessage.length > 50 ? firstMessage.substring(0, 50) + '...' : firstMessage;
+                const date = session.lastMessageAt?.toDate ? new Date(session.lastMessageAt.toDate()).toLocaleDateString() : 'Recent';
+                
+                return (
+                  <div
+                    key={session.id}
+                    onClick={() => {
+                      // Load this session's messages
+                      if (session.messages) {
+                        const loadedMessages: Message[] = session.messages.map((msg: any, idx: number) => ({
+                          id: `${session.id}_${idx}`,
+                          text: msg.content,
+                          sender: msg.role === 'user' ? 'user' : 'bot',
+                          timestamp: msg.timestamp?.toDate ? new Date(msg.timestamp.toDate()) : new Date(),
+                          image: msg.imageUrl
+                        }));
+                        setMessages(loadedMessages);
+                        setCurrentSessionId(session.id);
+                      }
+                    }}
+                    className="bg-white border border-black p-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                    style={{ 
+                      boxShadow: '5px 5px 0px 0px #000000',
+                      fontFamily: "'Silkscreen', monospace"
+                    }}
+                  >
+                    <div className="text-[12px] text-black font-bold">{date}</div>
+                    <div className="text-[10px] text-black mt-1 break-words uppercase">{preview}</div>
+                    <div className="text-[8px] text-gray-600 mt-1">{session.messages?.length || 0} MESSAGES</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          
+          {/* New Chat Button */}
+          <button
+            onClick={() => {
+              setMessages([]);
+              setCurrentSessionId(null);
+              setInputText('');
+              setSelectedImage(null);
+            }}
+            className="bg-[#523bb5] border border-black text-white py-2 px-4 hover:bg-[#6347d6] transition-colors"
+            style={{ boxShadow: '5px 5px 0px 0px #000000', fontFamily: "'Silkscreen', monospace" }}
+          >
+            + NEW CHAT
+          </button>
         </aside>
 
         {/* Center Content */}
@@ -266,7 +592,9 @@ Respond briefly and naturally:`;
                         {message.image && (
                           <img src={message.image} alt="Uploaded" className="max-w-full mb-2 rounded" />
                         )}
-                        <p className="text-black">{message.text}</p>
+                        <div className="text-black">
+                          {renderMessageContent(message.text)}
+                        </div>
                         <p className="text-xs text-gray-500 mt-2">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
@@ -288,14 +616,49 @@ Respond briefly and naturally:`;
             </div>
 
             {/* Input Area */}
-            <div className="p-4 flex gap-2 items-end border-t-2 border-black">
+            <div className="p-4 border-t-2 border-black">
+              {/* File Preview */}
+              {selectedImage && (
+                <div className="mb-2 flex items-center gap-2 bg-[#f0f0f0] border border-black p-2" style={{ boxShadow: '3px 3px 0px 0px #000000' }}>
+                  <div className="flex items-center gap-2 flex-1">
+                    {selectedImage.type.startsWith('image/') ? (
+                      <img 
+                        src={URL.createObjectURL(selectedImage)} 
+                        alt="Preview" 
+                        className="w-12 h-12 object-cover border border-black"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-red-500 border border-black flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">PDF</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-black" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                        {selectedImage.name}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {(selectedImage.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedImage(null)}
+                    className="bg-red-500 text-white border border-black px-2 py-1 text-xs hover:bg-red-600"
+                    style={{ fontFamily: "'Silkscreen', monospace" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              
+              <div className="flex gap-2 items-end">
               {/* Text Input */}
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
+                placeholder={selectedImage ? "Type your question about the file..." : "Type your message..."}
                 className="flex-1 h-[60px] px-4 border-2 border-black focus:outline-none"
                 style={{ fontFamily: "'Product Sans', sans-serif" }}
               />
@@ -319,7 +682,7 @@ Respond briefly and naturally:`;
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={handleImageUpload}
                 className="hidden"
               />
@@ -333,6 +696,7 @@ Respond briefly and naturally:`;
               >
                 <img src={imgMingcuteArrowUpFill} alt="Send" className="w-[44px] h-[44px]" />
               </button>
+              </div>
             </div>
 
             {selectedImage && (

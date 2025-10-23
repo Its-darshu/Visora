@@ -1,18 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { aiImageService } from '../services/aiImageService';
+import { firestoreService } from '../services/firestoreService';
+import { storageService } from '../services/storageService';
 
 // Figma assets
 const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
 const imgProfileTab = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
 
+interface GeneratedImageHistory {
+  id: string;
+  imageUrl: string;
+  prompt: string;
+  style?: string;
+  quality?: string;
+  createdAt: any;
+}
+
 const GenerateImagePage: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [imageHistory, setImageHistory] = useState<GeneratedImageHistory[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Load history when user changes
+  useEffect(() => {
+    if (currentUser) {
+      loadHistory();
+    } else {
+      setImageHistory([]);
+    }
+  }, [currentUser]);
+
+  const loadHistory = async () => {
+    if (!currentUser) return;
+    
+    setIsLoadingHistory(true);
+    try {
+      const history = await firestoreService.getGeneratedImages(currentUser.uid, 20);
+      setImageHistory(history as GeneratedImageHistory[]);
+      console.log('✅ Loaded', history.length, 'generated image history items');
+    } catch (error) {
+      console.error('❌ Failed to load history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleHistoryClick = (item: GeneratedImageHistory) => {
+    setGeneratedImage(item.imageUrl);
+    setPrompt(item.prompt);
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -25,6 +69,7 @@ const GenerateImagePage: React.FC = () => {
     setGeneratedImage(null);
     
     try {
+      console.log('🎨 Generating image...', { prompt });
       const result = await aiImageService.generateImage({
         prompt: prompt,
         style: 'artistic',
@@ -33,11 +78,50 @@ const GenerateImagePage: React.FC = () => {
       
       if (result.success && result.url) {
         setGeneratedImage(result.url);
+        
+        // Save to Cloudinary + Firestore if user is logged in
+        if (currentUser) {
+          try {
+            console.log('💾 Saving generated image to database...');
+            
+            // Convert data URL to blob
+            const response = await fetch(result.url);
+            const blob = await response.blob();
+            
+            // Upload to Cloudinary
+            const imageUrl = await storageService.uploadBlob(
+              blob,
+              currentUser.uid,
+              'generated',
+              `generated_${Date.now()}.png`
+            );
+            
+            // Save metadata to Firestore
+            await firestoreService.saveGeneratedImage({
+              userId: currentUser.uid,
+              prompt: prompt,
+              imageUrl,
+              style: 'artistic',
+              quality: 'high'
+            });
+            
+            // Update API usage
+            await firestoreService.updateUserApiUsage(currentUser.uid, 'imagesGenerated');
+            
+            console.log('✅ Generated image saved successfully!');
+            
+            // Reload history
+            loadHistory();
+          } catch (saveError) {
+            console.error('❌ Failed to save generated image:', saveError);
+            // Don't show error to user, generation was successful
+          }
+        }
       } else {
         setError('Failed to generate image. Please try again.');
       }
     } catch (error) {
-      console.error('Generation failed:', error);
+      console.error('❌ Generation failed:', error);
       setError('An error occurred while generating the image.');
     } finally {
       setIsGenerating(false);
@@ -57,7 +141,7 @@ const GenerateImagePage: React.FC = () => {
         {/* Logo */}
         <div 
           className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/visual-intelligence')}
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <h1 className="text-[40px] font-bold text-black">VISORA</h1>
@@ -102,10 +186,28 @@ const GenerateImagePage: React.FC = () => {
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="h-[89px] w-[182px] flex items-center justify-center"
+            className="h-[89px] w-[182px] flex items-center justify-center gap-3 px-4 bg-[#FFA500] border-2 border-black"
             style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
           >
-            <img src={imgProfileTab} alt="Profile" className="w-full h-full object-contain" />
+            <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
+              {currentUser?.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-[#ffb7ce]">
+                  <span className="text-2xl text-black" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    {currentUser?.displayName?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+              <path d="M7 10L12 15L17 10" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
           {showProfileMenu && (
             <div className="absolute right-0 top-full mt-2 bg-white border border-black z-50 min-w-[180px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
@@ -120,9 +222,10 @@ const GenerateImagePage: React.FC = () => {
                 Settings
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowProfileMenu(false);
-                  // Add logout logic here
+                  await logout();
+                  navigate('/auth');
                 }}
                 className="w-full px-4 py-3 text-left hover:bg-gray-100 text-black"
                 style={{ fontFamily: "'Silkscreen', monospace" }}
@@ -138,12 +241,41 @@ const GenerateImagePage: React.FC = () => {
       <main className="flex flex-col lg:flex-row gap-4 p-4 mt-4">
         {/* Left Sidebar - History */}
         <aside 
-          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4"
-          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-150px)]"
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000', paddingRight: '20px', paddingBottom: '20px' }}
         >
           <h2 className="text-[20px] text-black text-center">HISTORY</h2>
-          <div className="bg-white border border-black h-[44px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}></div>
-          {/* Add more history items here as needed */}
+          
+          {isLoadingHistory ? (
+            <div className="text-center text-black">Loading...</div>
+          ) : imageHistory.length === 0 ? (
+            <div className="bg-white border border-black p-3 text-center text-black text-sm">
+              No history yet
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {imageHistory.map((item) => (
+                <div 
+                  key={item.id}
+                  className="bg-white border border-black p-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                  style={{ boxShadow: '5px 5px 0px 0px #000000' }}
+                  onClick={() => handleHistoryClick(item)}
+                >
+                  <img 
+                    src={item.imageUrl} 
+                    alt="Generated image" 
+                    className="w-full h-[80px] object-cover mb-2 border border-black"
+                  />
+                  <p className="text-[10px] text-black truncate">
+                    {item.prompt.substring(0, 50) + (item.prompt.length > 50 ? '...' : '')}
+                  </p>
+                  <p className="text-[8px] text-gray-600 mt-1">
+                    {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Recent'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </aside>
 
         {/* Center Content */}

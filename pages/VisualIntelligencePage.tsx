@@ -1,16 +1,26 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { imageAnalysisService } from '../services/imageAnalysisService';
 import { useAuth } from '../contexts/AuthContext';
+import { firestoreService } from '../services/firestoreService';
+import { storageService } from '../services/storageService';
 
 // Figma asset URLs
 const imgProfileTab = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
 const imgVector = "http://localhost:3845/assets/b000d29f08e8de2107e6ac60627be28585c51daf.svg";
 const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
 
+interface VisualAnalysisHistory {
+  id: string;
+  imageUrl: string;
+  extractedText: string;
+  aiAnalysis: string;
+  createdAt: any;
+}
+
 const VisualIntelligencePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { currentUser, logout } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
@@ -18,6 +28,39 @@ const VisualIntelligencePage: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [analysisHistory, setAnalysisHistory] = useState<VisualAnalysisHistory[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Load history when user changes
+  useEffect(() => {
+    if (currentUser) {
+      loadHistory();
+    } else {
+      setAnalysisHistory([]);
+    }
+  }, [currentUser]);
+
+  const loadHistory = async () => {
+    if (!currentUser) return;
+    
+    setIsLoadingHistory(true);
+    try {
+      const history = await firestoreService.getVisualAnalysisHistory(currentUser.uid, 20);
+      setAnalysisHistory(history as VisualAnalysisHistory[]);
+      console.log('✅ Loaded', history.length, 'visual analysis history items');
+    } catch (error) {
+      console.error('❌ Failed to load history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleHistoryClick = (item: VisualAnalysisHistory) => {
+    setPreviewUrl(item.imageUrl);
+    setExtractedText(item.extractedText);
+    setAiAnalysis(item.aiAnalysis);
+    setSelectedFile(null);
+  };
 
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -46,6 +89,7 @@ const VisualIntelligencePage: React.FC = () => {
     setError(null);
     
     try {
+      console.log('🔍 Starting image analysis...', { file: selectedFile.name });
       const result = await imageAnalysisService.analyzeImage({
         file: selectedFile
       });
@@ -53,10 +97,44 @@ const VisualIntelligencePage: React.FC = () => {
       if (result.success) {
         setExtractedText(result.extractedText || '');
         setAiAnalysis(result.aiAnalysis || '');
+        
+        // Save to Cloudinary + Firestore if user is logged in
+        if (currentUser && (result.extractedText || result.aiAnalysis)) {
+          try {
+            console.log('💾 Saving visual analysis to database...');
+            
+            // Upload image to Cloudinary
+            const imageUrl = await storageService.uploadImage(
+              selectedFile,
+              currentUser.uid,
+              'analysis'
+            );
+            
+            // Save metadata to Firestore
+            await firestoreService.saveVisualAnalysis({
+              userId: currentUser.uid,
+              imageUrl,
+              extractedText: result.extractedText || '',
+              aiAnalysis: result.aiAnalysis || ''
+            });
+            
+            // Update API usage
+            await firestoreService.updateUserApiUsage(currentUser.uid, 'imagesProcessed');
+            
+            console.log('✅ Visual analysis saved successfully!');
+            
+            // Reload history
+            loadHistory();
+          } catch (saveError) {
+            console.error('❌ Failed to save analysis:', saveError);
+            // Don't show error to user, analysis was successful
+          }
+        }
       } else {
         setError(result.error || 'Failed to analyze image');
       }
     } catch (err) {
+      console.error('❌ Analysis failed:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsAnalyzing(false);
@@ -81,7 +159,7 @@ const VisualIntelligencePage: React.FC = () => {
         {/* Logo */}
         <div 
           className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/visual-intelligence')}
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <h1 className="text-[40px] font-bold text-black">VISORA</h1>
@@ -126,10 +204,28 @@ const VisualIntelligencePage: React.FC = () => {
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="h-[89px] w-[182px] flex items-center justify-center"
+            className="h-[89px] w-[182px] flex items-center justify-center gap-3 px-4 bg-[#FFA500] border-2 border-black"
             style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
           >
-            <img src={imgProfileTab} alt="Profile" className="w-full h-full object-contain" />
+            <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
+              {currentUser?.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-[#ffb7ce]">
+                  <span className="text-2xl text-black" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    {currentUser?.displayName?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+              <path d="M7 10L12 15L17 10" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
           {showProfileMenu && (
             <div className="absolute right-0 top-full mt-2 bg-white border border-black z-50 min-w-[180px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
@@ -144,9 +240,10 @@ const VisualIntelligencePage: React.FC = () => {
                 Settings
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowProfileMenu(false);
-                  // Add logout logic here
+                  await logout();
+                  navigate('/auth');
                 }}
                 className="w-full px-4 py-3 text-left hover:bg-gray-100 text-black"
                 style={{ fontFamily: "'Silkscreen', monospace" }}
@@ -162,12 +259,41 @@ const VisualIntelligencePage: React.FC = () => {
       <main className="flex flex-col lg:flex-row gap-4 p-4 mt-4">
         {/* Left Sidebar - History */}
         <aside 
-          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4"
-          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-150px)]"
+          style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000', paddingRight: '20px', paddingBottom: '20px' }}
         >
           <h2 className="text-[20px] text-black text-center">HISTORY</h2>
-          <div className="bg-white border border-black h-[44px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}></div>
-          {/* Add more history items here as needed */}
+          
+          {isLoadingHistory ? (
+            <div className="text-center text-black">Loading...</div>
+          ) : analysisHistory.length === 0 ? (
+            <div className="bg-white border border-black p-3 text-center text-black text-sm">
+              No history yet
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {analysisHistory.map((item) => (
+                <div 
+                  key={item.id}
+                  className="bg-white border border-black p-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                  style={{ boxShadow: '5px 5px 0px 0px #000000' }}
+                  onClick={() => handleHistoryClick(item)}
+                >
+                  <img 
+                    src={item.imageUrl} 
+                    alt="Analysis history" 
+                    className="w-full h-[80px] object-cover mb-2 border border-black"
+                  />
+                  <p className="text-[10px] text-black truncate">
+                    {item.extractedText ? item.extractedText.substring(0, 50) + '...' : 'Image analyzed'}
+                  </p>
+                  <p className="text-[8px] text-gray-600 mt-1">
+                    {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Recent'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </aside>
 
         {/* Center Content */}

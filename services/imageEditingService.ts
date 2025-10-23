@@ -19,6 +19,39 @@ export interface UpscaleOptions {
 }
 
 /**
+ * Remove background using Remove.bg API
+ */
+async function removeBackgroundWithRemoveBg(imageFile: File, apiKey: string): Promise<string> {
+  const formData = new FormData();
+  formData.append('image_file', imageFile);
+  formData.append('size', 'auto');
+  
+  const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': apiKey,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.errors?.[0]?.title || `Remove.bg API error: ${response.status}`);
+  }
+
+  // Get the image blob
+  const blob = await response.blob();
+  
+  // Convert blob to base64 data URL
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
  * Apply edge smoothing to reduce harsh transitions
  */
 function applyEdgeSmoothing(imageData: ImageData, width: number, height: number) {
@@ -152,7 +185,7 @@ export async function upscaleImage(
           originalImageUrl: originalUrl,
           operation: 'upscale',
           processingTime,
-          message: `Image upscaled ${options.scaleFactor}x (${img.width}x${img.height} → ${newWidth}x${newHeight}) in ${processingTime}ms`
+          message: `Image upscaled ${options.scaleFactor}x successfully`
         });
       };
       
@@ -175,12 +208,30 @@ export async function upscaleImage(
 }
 
 /**
- * Remove background from an image using advanced AI algorithms
- * Automatically detects and removes background with edge refinement
+ * Remove background from an image using Remove.bg API or fallback to local algorithm
+ * Automatically detects and removes background with professional quality
  */
 export async function removeBackground(imageFile: File): Promise<BackgroundRemovalResult> {
   const startTime = Date.now();
+  const REMOVEBG_API_KEY = import.meta.env.VITE_REMOVEBG_API_KEY;
   
+  // Try Remove.bg API first if API key is configured
+  if (REMOVEBG_API_KEY && REMOVEBG_API_KEY !== 'your_removebg_api_key_here') {
+    try {
+      const result = await removeBackgroundWithRemoveBg(imageFile, REMOVEBG_API_KEY);
+      return {
+        success: true,
+        imageUrl: result,
+        message: 'Background removed successfully',
+        hasBackground: false
+      };
+    } catch (error) {
+      console.warn('Remove.bg API failed, falling back to local algorithm:', error);
+      // Fall through to local algorithm
+    }
+  }
+  
+  // Fallback to local algorithm
   return new Promise((resolve) => {
     const reader = new FileReader();
     
@@ -260,12 +311,11 @@ export async function removeBackground(imageFile: File): Promise<BackgroundRemov
         ctx.putImageData(imageData, 0, 0);
         
         const resultUrl = canvas.toDataURL('image/png');
-        const processingTime = Date.now() - startTime;
         
         resolve({
           success: true,
           imageUrl: resultUrl,
-          message: `Background removed successfully in ${processingTime}ms`,
+          message: 'Background removed successfully',
           hasBackground: false
         });
       };
@@ -583,7 +633,7 @@ export async function enhanceImageQuality(
           originalImageUrl: originalUrl,
           operation: 'enhance',
           processingTime,
-          message: `Image enhanced successfully with AI in ${processingTime}ms`
+          message: 'Image enhanced successfully'
         });
       };
       
@@ -674,6 +724,265 @@ function applySharpeningFilter(imageData: ImageData, width: number, height: numb
       data[i + 2] = Math.min(255, Math.max(0, b));
     }
   }
+}
+
+/**
+ * Rotate and flip image
+ */
+export async function rotateFlipImage(
+  imageFile: File,
+  options: {
+    rotation: number; // degrees: 0, 90, 180, 270
+    flipHorizontal?: boolean;
+    flipVertical?: boolean;
+  }
+): Promise<ImageEditResult> {
+  const startTime = Date.now();
+  const originalUrl = URL.createObjectURL(imageFile);
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        // Calculate new dimensions based on rotation
+        const rad = (options.rotation * Math.PI) / 180;
+        const isRotated90or270 = options.rotation % 180 !== 0;
+        
+        canvas.width = isRotated90or270 ? img.height : img.width;
+        canvas.height = isRotated90or270 ? img.width : img.height;
+        
+        // Move to center
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        
+        // Apply transformations
+        if (options.flipHorizontal) ctx.scale(-1, 1);
+        if (options.flipVertical) ctx.scale(1, -1);
+        ctx.rotate(rad);
+        
+        // Draw image
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        
+        const editedImageUrl = canvas.toDataURL('image/png');
+        const processingTime = Date.now() - startTime;
+        
+        resolve({
+          success: true,
+          editedImageUrl,
+          originalImageUrl: originalUrl,
+          operation: 'rotate-flip',
+          processingTime,
+          message: 'Image transformed successfully'
+        });
+      };
+      
+      img.onerror = () => {
+        resolve({
+          success: false,
+          editedImageUrl: '',
+          originalImageUrl: originalUrl,
+          operation: 'rotate-flip',
+          processingTime: Date.now() - startTime,
+          error: 'Failed to load image'
+        });
+      };
+      
+      img.src = e.target?.result as string;
+    };
+    
+    reader.readAsDataURL(imageFile);
+  });
+}
+
+/**
+ * Apply filters and adjustments in real-time
+ */
+export async function applyFilterAndAdjustments(
+  imageFile: File,
+  options: {
+    filter?: 'none' | 'grayscale' | 'sepia' | 'vintage' | 'cool' | 'warm' | 'invert' | 'blur';
+    brightness?: number; // -100 to 100
+    contrast?: number; // -100 to 100
+    saturation?: number; // -100 to 100
+  }
+): Promise<ImageEditResult> {
+  const startTime = Date.now();
+  const originalUrl = URL.createObjectURL(imageFile);
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // Build filter string
+        const filters: string[] = [];
+        
+        // Apply preset filter
+        if (options.filter && options.filter !== 'none') {
+          switch (options.filter) {
+            case 'grayscale':
+              filters.push('grayscale(100%)');
+              break;
+            case 'sepia':
+              filters.push('sepia(100%)');
+              break;
+            case 'invert':
+              filters.push('invert(100%)');
+              break;
+            case 'vintage':
+              filters.push('sepia(50%) contrast(120%) brightness(90%)');
+              break;
+            case 'cool':
+              filters.push('saturate(150%) hue-rotate(180deg)');
+              break;
+            case 'warm':
+              filters.push('saturate(150%) hue-rotate(-20deg) brightness(110%)');
+              break;
+            case 'blur':
+              filters.push('blur(5px)');
+              break;
+          }
+        }
+        
+        // Apply manual adjustments
+        if (options.brightness !== undefined && options.brightness !== 0) {
+          filters.push(`brightness(${100 + options.brightness}%)`);
+        }
+        if (options.contrast !== undefined && options.contrast !== 0) {
+          filters.push(`contrast(${100 + options.contrast}%)`);
+        }
+        if (options.saturation !== undefined && options.saturation !== 0) {
+          filters.push(`saturate(${100 + options.saturation}%)`);
+        }
+        
+        ctx.filter = filters.join(' ');
+        ctx.drawImage(img, 0, 0);
+        
+        const editedImageUrl = canvas.toDataURL('image/png');
+        const processingTime = Date.now() - startTime;
+        
+        resolve({
+          success: true,
+          editedImageUrl,
+          originalImageUrl: originalUrl,
+          operation: 'filter-adjust',
+          processingTime,
+          message: 'Filter applied successfully'
+        });
+      };
+      
+      img.onerror = () => {
+        resolve({
+          success: false,
+          editedImageUrl: '',
+          originalImageUrl: originalUrl,
+          operation: 'filter-adjust',
+          processingTime: Date.now() - startTime,
+          error: 'Failed to load image'
+        });
+      };
+      
+      img.src = e.target?.result as string;
+    };
+    
+    reader.readAsDataURL(imageFile);
+  });
+}
+
+/**
+ * Smart crop with aspect ratio
+ */
+export async function smartCrop(
+  imageFile: File,
+  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '4:5' | 'original'
+): Promise<ImageEditResult> {
+  const startTime = Date.now();
+  const originalUrl = URL.createObjectURL(imageFile);
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        let targetRatio = img.width / img.height;
+        
+        // Calculate target aspect ratio
+        if (aspectRatio !== 'original') {
+          const [w, h] = aspectRatio.split(':').map(Number);
+          targetRatio = w / h;
+        }
+        
+        const currentRatio = img.width / img.height;
+        let sourceWidth = img.width;
+        let sourceHeight = img.height;
+        let sourceX = 0;
+        let sourceY = 0;
+        
+        if (aspectRatio !== 'original') {
+          if (currentRatio > targetRatio) {
+            // Image is wider, crop width
+            sourceWidth = img.height * targetRatio;
+            sourceX = (img.width - sourceWidth) / 2;
+          } else {
+            // Image is taller, crop height
+            sourceHeight = img.width / targetRatio;
+            sourceY = (img.height - sourceHeight) / 2;
+          }
+        }
+        
+        canvas.width = sourceWidth;
+        canvas.height = sourceHeight;
+        
+        ctx.drawImage(
+          img,
+          sourceX, sourceY, sourceWidth, sourceHeight,
+          0, 0, sourceWidth, sourceHeight
+        );
+        
+        const editedImageUrl = canvas.toDataURL('image/png');
+        const processingTime = Date.now() - startTime;
+        
+        resolve({
+          success: true,
+          editedImageUrl,
+          originalImageUrl: originalUrl,
+          operation: 'crop',
+          processingTime,
+          message: `Image cropped to ${aspectRatio} successfully`
+        });
+      };
+      
+      img.onerror = () => {
+        resolve({
+          success: false,
+          editedImageUrl: '',
+          originalImageUrl: originalUrl,
+          operation: 'crop',
+          processingTime: Date.now() - startTime,
+          error: 'Failed to load image'
+        });
+      };
+      
+      img.src = e.target?.result as string;
+    };
+    
+    reader.readAsDataURL(imageFile);
+  });
 }
 
 /**

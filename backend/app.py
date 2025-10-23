@@ -20,6 +20,14 @@ except ImportError:
     TESSERACT_AVAILABLE = False
     print("⚠️  Warning: pytesseract not available. OCR will use AI only.")
 
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    print("⚠️  Warning: PyPDF2 not available. PDF text extraction will not work.")
+    print("   Install with: pip install PyPDF2")
+
 # Load environment variables
 load_dotenv()
 
@@ -493,6 +501,80 @@ def analyze_content():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/extract-pdf', methods=['POST'])
+def extract_pdf_text():
+    """Extract text from PDF file - handles large PDFs up to 500 pages."""
+    try:
+        if not PDF_AVAILABLE:
+            return jsonify({'error': 'PyPDF2 not installed. Install with: pip install PyPDF2'}), 500
+
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'File must be a PDF'}), 400
+
+        # Save file temporarily
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        # Extract text from PDF
+        extracted_text = ""
+        page_texts = []
+        
+        with open(filepath, 'rb') as pdf_file:
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            num_pages = len(pdf_reader.pages)
+            
+            print(f"📄 Processing PDF: {filename} ({num_pages} pages)")
+            
+            # Process all pages (no limit)
+            for page_num in range(num_pages):
+                try:
+                    page = pdf_reader.pages[page_num]
+                    page_text = page.extract_text()
+                    if page_text.strip():
+                        page_texts.append(f"--- Page {page_num + 1} ---\n{page_text}")
+                        extracted_text += page_text + "\n\n"
+                except Exception as page_error:
+                    print(f"⚠️  Error extracting page {page_num + 1}: {str(page_error)}")
+                    continue
+
+        # Clean up file
+        os.remove(filepath)
+
+        if not extracted_text.strip():
+            return jsonify({'error': 'Could not extract text from PDF. It might be scanned or image-based.'}), 400
+
+        # Calculate text statistics
+        word_count = len(extracted_text.split())
+        char_count = len(extracted_text)
+        
+        print(f"✅ Extracted {word_count} words from {num_pages} pages")
+
+        return jsonify({
+            'success': True,
+            'text': extracted_text.strip(),
+            'pages': num_pages,
+            'filename': filename,
+            'wordCount': word_count,
+            'charCount': char_count,
+            'preview': extracted_text[:1000] + '...' if len(extracted_text) > 1000 else extracted_text
+        })
+
+    except Exception as e:
+        # Clean up file on error
+        if 'filepath' in locals() and os.path.exists(filepath):
+            os.remove(filepath)
+        print(f"❌ PDF extraction error: {str(e)}")
+        return jsonify({'error': f'PDF extraction failed: {str(e)}'}), 500
+
 # ============================================
 # END IMAGE ANALYSIS ENDPOINTS
 # ============================================
@@ -504,6 +586,13 @@ if __name__ == '__main__':
         print("   Please set your Hugging Face API token in .env file")
     else:
         print("✅ Hugging Face API token loaded successfully")
+    
+    # Check PyPDF2 availability
+    if PDF_AVAILABLE:
+        print("✅ PyPDF2 available - PDF text extraction enabled (supports 200+ pages)")
+    else:
+        print("⚠️  PyPDF2 not available - PDF text extraction disabled")
+        print("   Install with: pip install PyPDF2")
     
     print("🚀 Starting Hugging Face Flux API Service...")
     print("📡 Service will be available at: http://localhost:5000")

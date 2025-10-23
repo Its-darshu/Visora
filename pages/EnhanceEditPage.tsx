@@ -1,16 +1,30 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { removeBackground, enhanceImageQuality, upscaleImage } from '../services/imageEditingService';
+import { useAuth } from '../contexts/AuthContext';
+import { useImageHistory } from '../services/useHistory';
+import { ImageHistoryItem } from '../services/firestoreService';
+import { 
+  removeBackground, 
+  enhanceImageQuality, 
+  upscaleImage,
+  applyFilterAndAdjustments,
+  smartCrop,
+  rotateFlipImage
+} from '../services/imageEditingService';
 
 // Figma assets
 const imgProfileTab = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
 const imgVector = "http://localhost:3845/assets/b000d29f08e8de2107e6ac60627be28585c51daf.svg";
 const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
 
-type EditMode = 'upscale' | 'background-remover' | 'enhancing';
+type EditMode = 'upscale' | 'background-remover' | 'enhancing' | 'filters' | 'crop-resize' | 'adjustments';
+type FilterType = 'none' | 'grayscale' | 'sepia' | 'vintage' | 'cool' | 'warm' | 'invert' | 'blur';
+type AspectRatio = 'original' | '1:1' | '16:9' | '9:16' | '4:3' | '4:5';
 
 const EnhanceEditPage: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
+  const { history, loading: historyLoading, saveToHistory } = useImageHistory();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editedUrl, setEditedUrl] = useState<string | null>(null);
@@ -20,6 +34,18 @@ const EnhanceEditPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState<string>('');
   const [upscaleFactor, setUpscaleFactor] = useState<2 | 3 | 4>(2);
+  
+  // New feature states
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>('none');
+  const [brightness, setBrightness] = useState(0);
+  const [contrast, setContrast] = useState(0);
+  const [saturation, setSaturation] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [flipHorizontal, setFlipHorizontal] = useState(false);
+  const [flipVertical, setFlipVertical] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('original');
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [compareSlider, setCompareSlider] = useState(50);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -44,6 +70,7 @@ const EnhanceEditPage: React.FC = () => {
 
     try {
       let result;
+      let processedDataUrl: string | null = null;
       
       switch (selectedMode) {
         case 'upscale':
@@ -53,15 +80,23 @@ const EnhanceEditPage: React.FC = () => {
             enhanceQuality: true
           });
           if (result.editedImageUrl) {
+            processedDataUrl = result.editedImageUrl;
             setEditedUrl(result.editedImageUrl);
             setProcessingMessage(result.message || 'Image upscaled successfully!');
           }
           break;
           
         case 'background-remover':
-          setProcessingMessage('Removing background with AI...');
+          const hasRemoveBgKey = import.meta.env.VITE_REMOVEBG_API_KEY && 
+                                 import.meta.env.VITE_REMOVEBG_API_KEY !== 'your_removebg_api_key_here';
+          setProcessingMessage(
+            hasRemoveBgKey 
+              ? 'Removing background with Remove.bg API...' 
+              : 'Removing background with local AI algorithm...'
+          );
           const bgResult = await removeBackground(selectedFile);
           if (bgResult.imageUrl) {
+            processedDataUrl = bgResult.imageUrl;
             setEditedUrl(bgResult.imageUrl);
             setProcessingMessage(bgResult.message);
           }
@@ -73,10 +108,103 @@ const EnhanceEditPage: React.FC = () => {
             autoEnhance: true
           });
           if (result.editedImageUrl) {
+            processedDataUrl = result.editedImageUrl;
             setEditedUrl(result.editedImageUrl);
             setProcessingMessage(result.message || 'Image enhanced successfully!');
           }
           break;
+          
+        case 'filters':
+          setProcessingMessage('Applying filter and adjustments...');
+          result = await applyFilterAndAdjustments(selectedFile, {
+            filter: selectedFilter,
+            brightness,
+            contrast,
+            saturation
+          });
+          if (result.editedImageUrl) {
+            processedDataUrl = result.editedImageUrl;
+            setEditedUrl(result.editedImageUrl);
+            setProcessingMessage(result.message || 'Filter applied successfully!');
+          }
+          break;
+          
+        case 'crop-resize':
+          setProcessingMessage('Cropping image...');
+          result = await smartCrop(selectedFile, aspectRatio);
+          if (result.editedImageUrl) {
+            processedDataUrl = result.editedImageUrl;
+            setEditedUrl(result.editedImageUrl);
+            setProcessingMessage(result.message || 'Image cropped successfully!');
+          }
+          break;
+          
+        case 'adjustments':
+          setProcessingMessage('Applying transformations...');
+          result = await rotateFlipImage(selectedFile, {
+            rotation,
+            flipHorizontal,
+            flipVertical
+          });
+          if (result.editedImageUrl) {
+            processedDataUrl = result.editedImageUrl;
+            setEditedUrl(result.editedImageUrl);
+            setProcessingMessage(result.message || 'Image transformed successfully!');
+          }
+          break;
+      }
+
+      // Save to history if processing was successful
+      if (processedDataUrl && currentUser) {
+        try {
+          console.log('📸 Starting save to history...', { mode: selectedMode, user: currentUser.uid });
+          setProcessingMessage('Saving to history...');
+          
+          // Convert data URL to blob
+          const response = await fetch(processedDataUrl);
+          const blob = await response.blob();
+          console.log('✅ Blob created:', { size: blob.size, type: blob.type });
+          
+          // Map mode to history type
+          const modeToTypeMap: Record<EditMode, ImageHistoryItem['type']> = {
+            'upscale': 'upscale',
+            'background-remover': 'background-remove',
+            'enhancing': 'enhance',
+            'filters': 'filter',
+            'crop-resize': 'crop',
+            'adjustments': 'transform'
+          };
+          
+          console.log('💾 Saving to Cloudinary + Firestore...');
+          // Save to Cloudinary + Firestore
+          await saveToHistory(
+            selectedFile,
+            blob,
+            modeToTypeMap[selectedMode],
+            {
+              scaleFactor: upscaleFactor,
+              filter: selectedFilter,
+              brightness,
+              contrast,
+              saturation,
+              rotation,
+              flipHorizontal,
+              flipVertical,
+              aspectRatio
+            }
+          );
+          
+          console.log('🎉 Successfully saved to history!');
+          setProcessingMessage('Saved successfully!');
+        } catch (saveError) {
+          console.error('❌ Failed to save to history:', saveError);
+          setError('Processing complete, but failed to save to history. Check console for details.');
+        }
+      } else {
+        console.warn('⚠️ Skipping save:', { 
+          hasDataUrl: !!processedDataUrl, 
+          hasUser: !!currentUser 
+        });
       }
     } catch (error) {
       console.error('Processing failed:', error);
@@ -84,6 +212,36 @@ const EnhanceEditPage: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const applyQuickTransform = async (transform: 'rotate-90' | 'rotate-180' | 'rotate-270' | 'flip-h' | 'flip-v') => {
+    if (!selectedFile) return;
+    
+    let newRotation = rotation;
+    let newFlipH = flipHorizontal;
+    let newFlipV = flipVertical;
+    
+    switch (transform) {
+      case 'rotate-90':
+        newRotation = (rotation + 90) % 360;
+        break;
+      case 'rotate-180':
+        newRotation = (rotation + 180) % 360;
+        break;
+      case 'rotate-270':
+        newRotation = (rotation + 270) % 360;
+        break;
+      case 'flip-h':
+        newFlipH = !flipHorizontal;
+        break;
+      case 'flip-v':
+        newFlipV = !flipVertical;
+        break;
+    }
+    
+    setRotation(newRotation);
+    setFlipHorizontal(newFlipH);
+    setFlipVertical(newFlipV);
   };
 
   const handleClear = () => {
@@ -103,7 +261,7 @@ const EnhanceEditPage: React.FC = () => {
         {/* Logo */}
         <div 
           className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/visual-intelligence')}
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <h1 className="text-[40px] font-bold text-black">VISORA</h1>
@@ -148,10 +306,28 @@ const EnhanceEditPage: React.FC = () => {
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="h-[89px] w-[182px] flex items-center justify-center"
+            className="h-[89px] w-[182px] flex items-center justify-center gap-3 px-4 bg-[#FFA500] border-2 border-black"
             style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
           >
-            <img src={imgProfileTab} alt="Profile" className="w-full h-full object-contain" />
+            <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
+              {currentUser?.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-[#ffb7ce]">
+                  <span className="text-2xl text-black" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    {currentUser?.displayName?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+              <path d="M7 10L12 15L17 10" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
           {showProfileMenu && (
             <div className="absolute right-0 top-full mt-2 bg-white border border-black z-50 min-w-[180px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
@@ -166,9 +342,10 @@ const EnhanceEditPage: React.FC = () => {
                 Settings
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowProfileMenu(false);
-                  // Add logout logic here
+                  await logout();
+                  navigate('/auth');
                 }}
                 className="w-full px-4 py-3 text-left hover:bg-gray-100 text-black"
                 style={{ fontFamily: "'Silkscreen', monospace" }}
@@ -184,11 +361,43 @@ const EnhanceEditPage: React.FC = () => {
       <main className="flex flex-col lg:flex-row gap-4 p-4 mt-4">
         {/* Left Sidebar - History */}
         <aside 
-          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4"
+          className="bg-[#d8d8d8] border border-black w-full lg:w-[239px] p-4 flex flex-col gap-4 max-h-[calc(100vh-140px)] overflow-y-auto"
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <h2 className="text-[20px] text-black text-center">HISTORY</h2>
-          <div className="bg-white border border-black h-[44px]" style={{ boxShadow: '5px 5px 0px 0px #000000' }}></div>
+          
+          {historyLoading ? (
+            <div className="bg-white border border-black p-4 text-center" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
+              <p className="text-sm">Loading...</p>
+            </div>
+          ) : history.length === 0 ? (
+            <div className="bg-white border border-black p-4 text-center" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
+              <p className="text-xs">No history yet</p>
+            </div>
+          ) : (
+            history.slice(0, 10).map((item) => (
+              <div 
+                key={item.id}
+                className="bg-white border border-black p-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                style={{ boxShadow: '3px 3px 0px 0px #000000' }}
+                onClick={() => window.open(item.processedImageUrl, '_blank')}
+              >
+                <div className="flex items-center gap-2">
+                  <img 
+                    src={item.processedImageUrl} 
+                    alt={item.type}
+                    className="w-12 h-12 object-cover border border-black"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold truncate">{item.type.toUpperCase()}</p>
+                    <p className="text-[10px] text-gray-600">
+                      {new Date(item.createdAt.seconds * 1000).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </aside>
 
         {/* Center Content */}
@@ -232,11 +441,40 @@ const EnhanceEditPage: React.FC = () => {
             >
               <span className="text-[18px] md:text-[24px] text-black whitespace-nowrap">ENHANCING</span>
             </button>
+            <button
+              onClick={() => setSelectedMode('filters')}
+              className={`border border-black px-4 py-2 transition-colors ${
+                selectedMode === 'filters' ? 'bg-[#ffb7ce]' : 'bg-white hover:bg-[#ffb7ce]'
+              }`}
+              style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+            >
+              <span className="text-[18px] md:text-[24px] text-black whitespace-nowrap">FILTERS</span>
+            </button>
+            <button
+              onClick={() => setSelectedMode('crop-resize')}
+              className={`border border-black px-4 py-2 transition-colors ${
+                selectedMode === 'crop-resize' ? 'bg-[#ffb7ce]' : 'bg-white hover:bg-[#ffb7ce]'
+              }`}
+              style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+            >
+              <span className="text-[18px] md:text-[24px] text-black whitespace-nowrap">CROP & RESIZE</span>
+            </button>
+            <button
+              onClick={() => setSelectedMode('adjustments')}
+              className={`border border-black px-4 py-2 transition-colors ${
+                selectedMode === 'adjustments' ? 'bg-[#ffb7ce]' : 'bg-white hover:bg-[#ffb7ce]'
+              }`}
+              style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
+            >
+              <span className="text-[18px] md:text-[24px] text-black whitespace-nowrap">TRANSFORM</span>
+            </button>
           </div>
 
+          {/* Mode-specific controls */}
+          
           {/* Upscale Factor Selector */}
           {selectedMode === 'upscale' && (
-            <div className="flex gap-4 justify-center items-center">
+            <div className="flex gap-4 justify-center items-center flex-wrap">
               <span className="text-[18px] text-black" style={{ fontFamily: "'Silkscreen', monospace" }}>
                 Scale Factor:
               </span>
@@ -252,6 +490,133 @@ const EnhanceEditPage: React.FC = () => {
                   <span className="text-[16px] md:text-[20px] text-black">{factor}x</span>
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Filter Controls */}
+          {selectedMode === 'filters' && (
+            <div className="bg-white border border-black p-4" style={{ boxShadow: '5px 5px 0px 0px #000000' }}>
+              <div className="flex flex-wrap gap-3 mb-4">
+                {(['none', 'grayscale', 'sepia', 'vintage', 'cool', 'warm', 'invert', 'blur'] as FilterType[]).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setSelectedFilter(filter)}
+                    className={`border border-black px-3 py-1 text-sm transition-colors ${
+                      selectedFilter === filter ? 'bg-[#79d7a8]' : 'bg-white hover:bg-gray-100'
+                    }`}
+                    style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '2px 2px 0px 0px #000000' }}
+                  >
+                    {filter.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm block mb-1" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    Brightness: {brightness}
+                  </label>
+                  <input
+                    type="range"
+                    min="-100"
+                    max="100"
+                    value={brightness}
+                    onChange={(e) => setBrightness(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm block mb-1" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    Contrast: {contrast}
+                  </label>
+                  <input
+                    type="range"
+                    min="-100"
+                    max="100"
+                    value={contrast}
+                    onChange={(e) => setContrast(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm block mb-1" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                    Saturation: {saturation}
+                  </label>
+                  <input
+                    type="range"
+                    min="-100"
+                    max="100"
+                    value={saturation}
+                    onChange={(e) => setSaturation(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Crop & Resize Controls */}
+          {selectedMode === 'crop-resize' && (
+            <div className="flex gap-3 justify-center flex-wrap">
+              <span className="text-[16px] text-black self-center" style={{ fontFamily: "'Silkscreen', monospace" }}>
+                Aspect Ratio:
+              </span>
+              {(['original', '1:1', '16:9', '9:16', '4:3', '4:5'] as AspectRatio[]).map((ratio) => (
+                <button
+                  key={ratio}
+                  onClick={() => setAspectRatio(ratio)}
+                  className={`border border-black px-3 py-2 transition-colors ${
+                    aspectRatio === ratio ? 'bg-[#79d7a8]' : 'bg-white hover:bg-[#79d7a8]'
+                  }`}
+                  style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '3px 3px 0px 0px #000000' }}
+                >
+                  <span className="text-[14px] md:text-[16px] text-black">{ratio}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Transform Controls */}
+          {selectedMode === 'adjustments' && (
+            <div className="flex gap-3 justify-center flex-wrap">
+              <button
+                onClick={() => applyQuickTransform('rotate-90')}
+                className="border border-black px-4 py-2 bg-white hover:bg-[#79d7a8] transition-colors"
+                style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '3px 3px 0px 0px #000000' }}
+              >
+                ↻ 90°
+              </button>
+              <button
+                onClick={() => applyQuickTransform('rotate-180')}
+                className="border border-black px-4 py-2 bg-white hover:bg-[#79d7a8] transition-colors"
+                style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '3px 3px 0px 0px #000000' }}
+              >
+                ↻ 180°
+              </button>
+              <button
+                onClick={() => applyQuickTransform('rotate-270')}
+                className="border border-black px-4 py-2 bg-white hover:bg-[#79d7a8] transition-colors"
+                style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '3px 3px 0px 0px #000000' }}
+              >
+                ↻ 270°
+              </button>
+              <button
+                onClick={() => applyQuickTransform('flip-h')}
+                className={`border border-black px-4 py-2 transition-colors ${
+                  flipHorizontal ? 'bg-[#79d7a8]' : 'bg-white hover:bg-[#79d7a8]'
+                }`}
+                style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '3px 3px 0px 0px #000000' }}
+              >
+                ↔ FLIP H
+              </button>
+              <button
+                onClick={() => applyQuickTransform('flip-v')}
+                className={`border border-black px-4 py-2 transition-colors ${
+                  flipVertical ? 'bg-[#79d7a8]' : 'bg-white hover:bg-[#79d7a8]'
+                }`}
+                style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '3px 3px 0px 0px #000000' }}
+              >
+                ↕ FLIP V
+              </button>
             </div>
           )}
 
@@ -386,34 +751,12 @@ const EnhanceEditPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-4">
-                  {isProcessing ? (
+                  {isProcessing && (
                     <>
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent"></div>
                       <p className="text-gray-600 text-center" style={{ fontFamily: "'Silkscreen', monospace" }}>
                         {processingMessage || 'Processing your image...'}
                       </p>
-                    </>
-                  ) : (
-                    <>
-                      <img src={imgVector2} alt="Output" className="w-[60px] h-[60px] opacity-30" />
-                      <p className="text-gray-400 text-center" style={{ fontFamily: "'Product Sans', sans-serif" }}>
-                        Upload an image and click Submit to see the result
-                      </p>
-                      {selectedMode === 'upscale' && (
-                        <p className="text-sm text-gray-500 text-center max-w-md" style={{ fontFamily: "'Product Sans', sans-serif" }}>
-                          AI Upscaling will enhance your image resolution up to {upscaleFactor}x while preserving quality, texture, and sharpness.
-                        </p>
-                      )}
-                      {selectedMode === 'background-remover' && (
-                        <p className="text-sm text-gray-500 text-center max-w-md" style={{ fontFamily: "'Product Sans', sans-serif" }}>
-                          AI Background Remover will automatically detect and remove the background, creating a transparent PNG.
-                        </p>
-                      )}
-                      {selectedMode === 'enhancing' && (
-                        <p className="text-sm text-gray-500 text-center max-w-md" style={{ fontFamily: "'Product Sans', sans-serif" }}>
-                          AI Image Enhancer will automatically fix lighting, color balance, contrast, and clarity for professional results.
-                        </p>
-                      )}
                     </>
                   )}
                 </div>
