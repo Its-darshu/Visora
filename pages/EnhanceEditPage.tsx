@@ -12,10 +12,8 @@ import {
   rotateFlipImage
 } from '../services/imageEditingService';
 
-// Figma assets
-const imgProfileTab = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
-const imgVector = "http://localhost:3845/assets/b000d29f08e8de2107e6ac60627be28585c51daf.svg";
-const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
+// Local icons from public folder
+const imgUploadIcon = "/images/upload icon.svg";
 
 type EditMode = 'upscale' | 'background-remover' | 'enhancing' | 'filters' | 'crop-resize' | 'adjustments';
 type FilterType = 'none' | 'grayscale' | 'sepia' | 'vintage' | 'cool' | 'warm' | 'invert' | 'blur';
@@ -636,7 +634,7 @@ const EnhanceEditPage: React.FC = () => {
                   <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
                 ) : (
                   <>
-                    <img src={imgVector} alt="Upload" className="w-[40px] h-[40px]" />
+                    <img src={imgUploadIcon} alt="Upload" className="w-[40px] h-[40px]" />
                     <p className="text-[24px] text-black">UPLOAD</p>
                   </>
                 )}

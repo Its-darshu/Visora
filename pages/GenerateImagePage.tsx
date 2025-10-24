@@ -5,9 +5,8 @@ import { aiImageService } from '../services/aiImageService';
 import { firestoreService } from '../services/firestoreService';
 import { storageService } from '../services/storageService';
 
-// Figma assets
-const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
-const imgProfileTab = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
+// Local icons from public folder
+const imgUploadIcon = "/images/upload icon.svg";
 
 interface GeneratedImageHistory {
   id: string;

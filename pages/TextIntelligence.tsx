@@ -7,11 +7,11 @@ import { storageService } from '../services/storageService';
 import { useChatHistory } from '../services/useHistory';
 import { Timestamp } from 'firebase/firestore';
 
-// Figma assets
-const imgProfile = "http://localhost:3845/assets/b36fb9a23aa0879e9d468c45544441be50dc416b.svg";
-const imgMaterialSymbolsMic = "http://localhost:3845/assets/ab77041ce23a001b94fff29d324ed7489a7b576a.svg";
-const imgMaterialSymbolsUpload = "http://localhost:3845/assets/557bb38354a7d4486fce8183544baab7eb2b20ad.svg";
-const imgMingcuteArrowUpFill = "http://localhost:3845/assets/d70bec6c72191b8579a099650b0e19ac3297b32a.svg";
+// Local icons from public folder
+const imgMicIcon = "/images/mic icon.svg";
+const imgUploadIcon = "/images/upload icon.svg";
+const imgSubmitIcon = "/images/submit icon.svg";
+const imgCopyIcon = "/images/copy button logo.svg";
 
 interface Message {
   id: string;
@@ -517,10 +517,7 @@ Respond with well-formatted, easy-to-read content:`;
                 style={{ boxShadow: '2px 2px 0px 0px #000000', fontFamily: "'Silkscreen', monospace" }}
                 title="Copy code"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
+                <img src={imgCopyIcon} alt="Copy" className="w-4 h-4" />
                 <span className="text-[10px] font-bold">COPY</span>
               </button>
             </div>
@@ -794,10 +791,7 @@ Respond with well-formatted, easy-to-read content:`;
                                 </>
                               ) : (
                                 <>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                  </svg>
+                                  <img src={imgCopyIcon} alt="Copy" className="w-3 h-3" />
                                   COPY
                                 </>
                               )}
@@ -916,7 +910,7 @@ Respond with well-formatted, easy-to-read content:`;
                 style={{ boxShadow: '3px 3px 0px 0px #000000' }}
               >
                 <img 
-                  src={imgMaterialSymbolsMic} 
+                  src={imgMicIcon} 
                   alt="Mic" 
                   className={`w-[44px] h-[44px] ${isListening ? 'brightness-0 invert' : ''}`}
                 />
@@ -928,7 +922,7 @@ Respond with well-formatted, easy-to-read content:`;
                 className="bg-[#d3e4ff] border-2 border-black h-[60px] w-[84px] flex items-center justify-center hover:bg-[#c0d4ef] transition-colors"
                 title="Upload Image"
               >
-                <img src={imgMaterialSymbolsUpload} alt="Upload" className="w-[44px] h-[44px]" />
+                <img src={imgUploadIcon} alt="Upload" className="w-[44px] h-[44px]" />
               </button>
               <input
                 ref={fileInputRef}
@@ -945,7 +939,7 @@ Respond with well-formatted, easy-to-read content:`;
                 className="bg-[#c5b5ff] border-2 border-black h-[60px] w-[84px] flex items-center justify-center hover:bg-[#b3a0ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Send"
               >
-                <img src={imgMingcuteArrowUpFill} alt="Send" className="w-[44px] h-[44px]" />
+                <img src={imgSubmitIcon} alt="Send" className="w-[44px] h-[44px]" />
               </button>
               </div>
             </div>
