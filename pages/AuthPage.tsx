@@ -2,11 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-// Figma asset URLs
-const imgImage15 = "http://localhost:3845/assets/f091c566b8c9673bd703afd284b3acadc868c78a.png";
-const imgImage16 = "http://localhost:3845/assets/29ef1653c6c50bcf1367970eb4e4ed8cd71a70c5.png";
-const imgVector2 = "http://localhost:3845/assets/9fb364bb7abf720d0cdcf9340051bcda0936312f.svg";
-const imgVector3 = "http://localhost:3845/assets/2d98a8cff21a2135098ff5519bad6ad96e5ac270.svg";
+// Local images from public folder
+const imgLoginImage = "/images/login image.svg";
+const imgGoogleLogo = "/images/googe logo.svg"; // Note: filename has typo "googe"
 
 const AuthPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -102,7 +100,7 @@ const AuthPage: React.FC = () => {
       {/* Left Panel - Illustration */}
       <div className="hidden lg:flex lg:w-[40%] relative items-start justify-start overflow-hidden">
         <img 
-          src={imgImage15} 
+          src={imgLoginImage} 
           alt="Student illustration" 
           className="h-[775px] w-[565px] object-cover"
           style={{ marginLeft: '-29px', marginTop: '0px' }}
@@ -254,7 +252,7 @@ const AuthPage: React.FC = () => {
                   fontFamily: "'Silkscreen', monospace"
                 }}
               >
-                <img src={imgImage16} alt="Google" className="w-[55px] h-[55px] z-10" />
+                <img src={imgGoogleLogo} alt="Google" className="w-[55px] h-[55px] z-10" />
                 <span className="text-[20px] z-10">SIGNUP WITH GOOGLE</span>
                 <div 
                   className="absolute top-0 right-0 bottom-0 w-[180px] pointer-events-none"

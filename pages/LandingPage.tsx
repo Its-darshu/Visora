@@ -1,13 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Figma asset URLs - these would need to be replaced with actual hosted images
-const imgImage5 = "http://localhost:3845/assets/8c7cbc264e1a1b0bf8ff1a3b63eff8557ba2699a.png";
-const imgImage11 = "http://localhost:3845/assets/2d77adbc1454fcc900966fe00c8271f8c74f530d.png";
-const imgImage10 = "http://localhost:3845/assets/7aaddfc06f95636c236614045695e56d8af03ba7.png";
-const imgImage12 = "http://localhost:3845/assets/7ffb3174034c8c0936a339affbdb3db1b0c61f27.png";
-const imgImage13 = "http://localhost:3845/assets/d45c930b52a060fb25f3602bfa5142c921abca32.png";
-const imgVector2 = "http://localhost:3845/assets/0754963926bcfcd3866dfd662375ce6c73a806d1.svg";
+// Local images from public folder
+const imgBackgroundImage = "/images/background image.svg";
+const imgCard1 = "/images/card1.svg";
+const imgCard2 = "/images/card2.svg";
+const imgCard3 = "/images/card3.svg";
+const imgCard4 = "/images/card4.svg";
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,25 +14,25 @@ const LandingPage: React.FC = () => {
   const cards = [
     {
       bg: '#9982FB',
-      image: imgImage11,
+      image: imgCard1,
       text: 'Generate image from text description',
       textColor: 'text-black'
     },
     {
       bg: '#FFE07B',
-      image: imgImage10,
+      image: imgCard2,
       text: 'Turn images into meaningful descriptions.',
       textColor: 'text-black'
     },
     {
       bg: '#FFA04C',
-      image: imgImage12,
+      image: imgCard3,
       text: 'Improve image quality with intelligent precision.',
       textColor: 'text-black'
     },
     {
       bg: '#79C579',
-      image: imgImage13,
+      image: imgCard4,
       text: 'Improve image quality with intelligent precision.',
       textColor: 'text-black'
     }
@@ -70,9 +69,9 @@ const LandingPage: React.FC = () => {
       {/* Background Image - Centered and Faded */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[752px] h-[752px] pointer-events-none z-0">
         <img 
-          src={imgImage5} 
+          src={imgBackgroundImage} 
           alt="" 
-          className="w-full h-full object-contain opacity-[0.27]"
+          className="w-full h-full object-contain opacity-[0.5]"
         />
       </div>
 
@@ -122,14 +121,17 @@ const LandingPage: React.FC = () => {
           {cards.map((card, idx) => (
             <div 
               key={idx}
-              className="border-2 border-black w-[341px] min-h-[317px] flex flex-col items-center p-5 hover:shadow-lg transition-shadow flex-shrink-0"
+              className="border border-black w-[341px] min-h-[317px] flex flex-col items-center p-5 flex-shrink-0"
               style={{ 
                 backgroundColor: card.bg,
-                boxShadow: '5px 4px 0px 0px #000000'
+                boxShadow: '8px 8px 0px 0px #000000'
               }}
             >
               {/* Card Image */}
-              <div className="border-2 border-black w-full h-[197px] bg-white overflow-hidden mb-5 flex-shrink-0">
+              <div 
+                className="border border-black w-full h-[197px] bg-white overflow-hidden mb-5 flex-shrink-0"
+                style={{ boxShadow: '5px 5px 0px 0px #000000' }}
+              >
                 <img 
                   src={card.image} 
                   alt="" 
