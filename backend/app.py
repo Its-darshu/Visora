@@ -32,7 +32,10 @@ except ImportError:
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend communication
+
+# Configure CORS for production
+frontend_url = os.getenv('FRONTEND_URL', '*')
+CORS(app, origins=[frontend_url, 'http://localhost:5173', 'http://localhost:3000'])
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
