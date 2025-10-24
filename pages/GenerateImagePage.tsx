@@ -140,16 +140,16 @@ const GenerateImagePage: React.FC = () => {
       <header className="flex items-center p-1.5 gap-2">
         {/* Logo */}
         <div 
-          className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
+          className="bg-white border border-black flex items-center justify-center h-[65px] px-6 cursor-pointer flex-shrink-0"
           onClick={() => navigate('/visual-intelligence')}
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
-          <h1 className="text-[40px] font-bold text-black">VISORA</h1>
+          <h1 className="text-[30px] font-bold text-black">VISORA</h1>
         </div>
 
         {/* Navigation Bar */}
         <nav 
-          className="bg-[#e07400] border border-black flex items-center justify-center gap-0 h-[89px] flex-1 overflow-hidden"
+          className="bg-[#e07400] border border-black flex items-center justify-center gap-0 h-[65px] flex-1 overflow-hidden"
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <button
@@ -157,28 +157,28 @@ const GenerateImagePage: React.FC = () => {
             className="border border-black px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">VISUAL AI</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">VISUAL AI</span>
           </button>
           <button
             onClick={() => navigate('/generate-image')}
             className="bg-[#523bb5] border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-[#6347d6] transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">GENERATE</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">GENERATE</span>
           </button>
           <button
             onClick={() => navigate('/enhance-edit')}
             className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">AI STUDIO</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">AI STUDIO</span>
           </button>
           <button
             onClick={() => navigate('/text-intelligence')}
             className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">CHAT</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">CHAT</span>
           </button>
         </nav>
 
@@ -186,10 +186,10 @@ const GenerateImagePage: React.FC = () => {
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="h-[89px] w-[182px] flex items-center justify-center gap-3 px-4 bg-[#FFA500] border-2 border-black"
+            className="h-[65px] w-[150px] flex items-center justify-center gap-2 px-3 bg-[#FFA500] border-2 border-black"
             style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
           >
-            <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
+            <div className="w-[45px] h-[45px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
               {currentUser?.photoURL ? (
                 <img 
                   src={currentUser.photoURL} 
@@ -352,8 +352,8 @@ const GenerateImagePage: React.FC = () => {
 
             {/* Output Region */}
             <div 
-              className="bg-white border border-black w-full lg:flex-1 min-h-[466px] p-6 overflow-hidden flex items-center justify-center"
-              style={{ fontFamily: "'Product Sans', sans-serif", boxShadow: '5px 5px 0px 0px #000000' }}
+              className="bg-white border border-black w-full lg:flex-1 p-6 overflow-hidden flex items-center justify-center"
+              style={{ fontFamily: "'Product Sans', sans-serif", boxShadow: '5px 5px 0px 0px #000000', maxHeight: 'calc(100vh - 200px)' }}
             >
               {generatedImage ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-4">
@@ -361,7 +361,7 @@ const GenerateImagePage: React.FC = () => {
                     src={generatedImage}
                     alt="Generated"
                     crossOrigin="anonymous"
-                    className="max-w-full max-h-[400px] object-contain"
+                    className="max-w-full max-h-[calc(100vh-300px)] object-contain"
                     onError={(e) => {
                       console.error('Image failed to load:', generatedImage);
                       setError('Failed to load the generated image.');

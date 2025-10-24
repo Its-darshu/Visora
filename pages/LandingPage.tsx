@@ -14,25 +14,25 @@ const LandingPage: React.FC = () => {
 
   const cards = [
     {
-      bg: '#2f00ff',
+      bg: '#9982FB',
       image: imgImage11,
       text: 'Generate image from text description',
-      textColor: 'text-white'
+      textColor: 'text-black'
     },
     {
-      bg: '#ffc300',
+      bg: '#FFE07B',
       image: imgImage10,
       text: 'Turn images into meaningful descriptions.',
       textColor: 'text-black'
     },
     {
-      bg: '#ff7700',
+      bg: '#FFA04C',
       image: imgImage12,
       text: 'Improve image quality with intelligent precision.',
-      textColor: 'text-white'
+      textColor: 'text-black'
     },
     {
-      bg: '#3cff00',
+      bg: '#79C579',
       image: imgImage13,
       text: 'Improve image quality with intelligent precision.',
       textColor: 'text-black'
@@ -45,25 +45,25 @@ const LandingPage: React.FC = () => {
       <header className="flex items-center justify-between p-1.5">
         {/* Visora Logo/Title */}
         <div 
-          className="flex-1 bg-white border-2 border-black flex items-center justify-start h-[89px] pl-6"
+          className="flex-1 bg-white border-2 border-black flex items-center justify-start h-[65px] pl-6"
           style={{ 
             fontFamily: "'Silkscreen', monospace",
             boxShadow: '5px 4px 0px 0px #000000'
           }}
         >
-          <h1 className="text-[40px] font-bold text-black tracking-wider">VISORA</h1>
+          <h1 className="text-[30px] font-bold text-black tracking-wider">VISORA</h1>
         </div>
         
         {/* Signup Button */}
         <button 
           onClick={() => navigate('/auth')}
-          className="bg-[#ffa600] border-2 border-black h-[89px] px-8 flex items-center justify-center hover:bg-[#ff9500] transition-colors ml-2"
+          className="bg-[#ffa600] border-2 border-black h-[65px] px-8 flex items-center justify-center hover:bg-[#ff9500] transition-colors ml-2"
           style={{ 
             fontFamily: "'Silkscreen', monospace",
             boxShadow: '5px 4px 0px 0px #000000'
           }}
         >
-          <span className="text-[24px] text-black font-normal">SIGNUP</span>
+          <span className="text-[20px] text-black font-normal">SIGNUP</span>
         </button>
       </header>
 
@@ -83,8 +83,8 @@ const LandingPage: React.FC = () => {
           {/* Main Heading */}
           <div className="text-center">
             <h2 
-              className="text-[32px] leading-tight text-black"
-              style={{ fontFamily: "'Silkscreen', monospace" }}
+              className="text-[48px] leading-tight text-black"
+              style={{ fontFamily: "'Silkscreen', monospace", textShadow: '4px 4px 0px rgba(0, 0, 0, 0.2)' }}
             >
               A VISORA<br />
               ALL-IN-ONE WORKSPACE OF AI<br />

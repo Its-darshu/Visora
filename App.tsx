@@ -10,6 +10,7 @@ import EnhanceEditPage from './pages/EnhanceEditPage';
 import TextIntelligence from './pages/TextIntelligence';
 import AppIntelligencePage from './pages/AppIntelligencePage';
 import RealTimePredictionsPage from './pages/RealTimePredictionsPage';
+import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -75,6 +76,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <RealTimePredictionsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             } 
           />

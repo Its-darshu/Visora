@@ -17,14 +17,36 @@ dist-ssr
 !.env.example
 .env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
+.env.figma
 
 # Backend environment files
 backend/.env*
 backend/*.env*
 !backend/.env.example
+backend/.env
+backend/.env.local
+backend/.env.production
+
+# Python virtual environment
+venv/
+env/
+ENV/
+.venv/
+backend/venv/
+backend/env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
 # API Keys and Secrets (NEVER COMMIT THESE!)
 **/config/**/secrets.*
@@ -34,6 +56,8 @@ backend/*.env*
 **/*token*
 **/*api*
 **/credentials.*
+firebase-config.json
+serviceAccountKey.json
 
 # Editor directories and files
 .vscode/*
@@ -62,3 +86,12 @@ SECURITY_ALERT.md
 *.tmp
 *.temp
 test-gemini-api.js
+
+# Build artifacts
+build/
+.next/
+out/
+
+# Database
+*.sqlite
+*.db

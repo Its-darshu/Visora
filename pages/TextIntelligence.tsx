@@ -36,77 +36,67 @@ const TextIntelligence: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const shouldBeListeningRef = useRef(false);
 
-  // Initialize speech recognition
+  // Initialize speech recognition - SIMPLE VERSION
   useEffect(() => {
-    // Check if browser supports speech recognition
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      recognition.onstart = () => {
-        console.log('🎤 Voice recognition started');
-        setIsListening(true);
-      };
-
       recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((result: any) => result[0])
-          .map((result: any) => result.transcript)
-          .join('');
-        
-        setInputText(transcript);
+        // Simple: just get the latest transcript
+        const transcript = event.results[event.results.length - 1][0].transcript;
         console.log('📝 Transcript:', transcript);
+        setInputText(transcript);
       };
 
       recognition.onerror = (event: any) => {
-        console.error('❌ Speech recognition error:', event.error);
+        console.error('❌ Error:', event.error);
         setIsListening(false);
-        
-        if (event.error === 'no-speech') {
-          alert('No speech detected. Please try again.');
-        } else if (event.error === 'not-allowed') {
-          alert('Microphone access denied. Please allow microphone access in your browser settings.');
-        }
       };
 
       recognition.onend = () => {
-        console.log('🎤 Voice recognition ended');
+        console.log('🎤 Ended');
         setIsListening(false);
       };
 
       recognitionRef.current = recognition;
-    } else {
-      console.warn('⚠️ Speech recognition not supported in this browser');
     }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle microphone button click
+  // Handle microphone button click - SIMPLE VERSION
   const handleMicClick = () => {
     if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
+      alert('Speech recognition not supported. Use Chrome or Edge.');
       return;
     }
 
     if (isListening) {
+      // Stop
+      console.log('🛑 Stop');
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      recognitionRef.current.start();
+      // Start
+      console.log('▶️ Start');
+      setInputText(''); // Clear input
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Failed to start:', error);
+        setIsListening(false);
+        alert('Failed to start voice recognition. Please try again.');
+      }
     }
   };
 
@@ -565,16 +555,16 @@ Respond with well-formatted, easy-to-read content:`;
       <header className="flex items-center p-1.5 gap-2">
         {/* Logo */}
         <div 
-          className="bg-white border border-black flex items-center justify-center h-[89px] px-6 cursor-pointer flex-shrink-0"
+          className="bg-white border border-black flex items-center justify-center h-[65px] px-6 cursor-pointer flex-shrink-0"
           onClick={() => navigate('/visual-intelligence')}
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
-          <h1 className="text-[40px] font-bold text-black">VISORA</h1>
+          <h1 className="text-[30px] font-bold text-black">VISORA</h1>
         </div>
 
         {/* Navigation Bar */}
         <nav 
-          className="bg-[#e07400] border border-black flex items-center justify-center gap-0 h-[89px] flex-1 overflow-hidden"
+          className="bg-[#e07400] border border-black flex items-center justify-center gap-0 h-[65px] flex-1 overflow-hidden"
           style={{ fontFamily: "'Silkscreen', monospace", boxShadow: '5px 5px 0px 0px #000000' }}
         >
           <button
@@ -582,28 +572,28 @@ Respond with well-formatted, easy-to-read content:`;
             className="border border-black px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">VISUAL AI</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">VISUAL AI</span>
           </button>
           <button
             onClick={() => navigate('/generate-image')}
             className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">GENERATE</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">GENERATE</span>
           </button>
           <button
             onClick={() => navigate('/enhance-edit')}
             className="border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-black/10 transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">AI STUDIO</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">AI STUDIO</span>
           </button>
           <button
             onClick={() => navigate('/text-intelligence')}
             className="bg-[#523bb5] border border-black border-l-0 px-4 md:px-6 lg:px-8 h-full flex-1 min-w-0 hover:bg-[#6347d6] transition-colors flex items-center justify-center"
             style={{ textShadow: '#000000 2px 2px 0px' }}
           >
-            <span className="text-[20px] md:text-[28px] lg:text-[36px] text-white whitespace-nowrap">CHAT</span>
+            <span className="text-[16px] md:text-[22px] lg:text-[28px] text-white whitespace-nowrap">CHAT</span>
           </button>
         </nav>
 
@@ -611,10 +601,10 @@ Respond with well-formatted, easy-to-read content:`;
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="h-[89px] w-[182px] flex items-center justify-center gap-3 px-4 bg-[#FFA500] border-2 border-black"
+            className="h-[65px] w-[150px] flex items-center justify-center gap-2 px-3 bg-[#FFA500] border-2 border-black"
             style={{ filter: 'drop-shadow(5px 5px 0px #000000)' }}
           >
-            <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
+            <div className="w-[45px] h-[45px] rounded-full overflow-hidden border-2 border-black bg-gray-200 flex-shrink-0">
               {currentUser?.photoURL ? (
                 <img 
                   src={currentUser.photoURL} 
@@ -745,10 +735,10 @@ Respond with well-formatted, easy-to-read content:`;
           {/* Chat Container */}
           <div 
             className="bg-white border-4 border-black flex flex-col"
-            style={{ boxShadow: '5px 5px 0px 0px #000000', height: '587px' }}
+            style={{ boxShadow: '5px 5px 0px 0px #000000', height: 'calc(100vh - 250px)' }}
           >
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(587px - 100px)' }}>
+            <div className="flex-1 overflow-y-auto p-6">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
@@ -764,7 +754,7 @@ Respond with well-formatted, easy-to-read content:`;
                       key={message.id}
                       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className="flex flex-col max-w-[70%]">
+                      <div className="flex flex-col max-w-[85%]">
                         <div
                           className={`p-4 border border-black ${
                             message.sender === 'user' ? 'bg-[#d3e4ff]' : 'bg-[#f0f0f0]'
